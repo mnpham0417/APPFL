@@ -1,0 +1,260 @@
+"""
+CLIPLoRATrainer: Client-side trainer for federated CLIP + LoRA fine-tuning.
+
+Extends VanillaTrainer to handle CLIP's dual-encoder architecture and
+LoRA-specific parameter management.  The model passed in must be a CLIP
+model with LoRA layers already applied (via the model file at
+examples/resources/model/clip_lora_model.py).
+
+Key differences from VanillaTrainer:
+  - Freezes all non-LoRA parameters once (on first train() call).
+  - Builds text features from classnames + template for the cosine-
+    similarity loss; caches them when the text encoder is frozen.
+  - Uses AdamW + CosineAnnealingLR over num_local_steps per round.
+  - Uses torch.amp mixed-precision (fp16) matching clip_lora's original.
+  - get_parameters() returns the full model state dict so the server
+    aggregator can apply AB_SVD to the LoRA matrices while leaving
+    frozen parameters unchanged via standard weighted average.
+
+Required train_configs keys:
+    classnames (list[str]): class labels for the dataset.
+    template   (list[str]): e.g. ["a photo of a {}."]
+    mode       (str): must be "step".
+    num_local_steps (int): local training steps per FL round.
+
+Optional train_configs keys:
+    encoder        (str):   "vision" | "text" | "both". Default: "both".
+    freeze_a       (bool):  freeze w_lora_A matrices.    Default: False.
+    logit_scale    (float): CLIP cosine-sim scaling.     Default: 100.0.
+    lr             (float): AdamW learning rate.         Default: 2e-4.
+    weight_decay   (float): AdamW weight decay.          Default: 1e-2.
+    device         (str):   training device.             Default: "cuda".
+"""
+
+import copy
+import torch
+import torch.nn.functional as F
+from omegaconf import DictConfig
+from typing import Optional, Any, Dict, Union, OrderedDict
+from torch.utils.data import Dataset, DataLoader
+
+from appfl.algorithm.trainer.vanilla_trainer import VanillaTrainer
+
+
+class CLIPLoRATrainer(VanillaTrainer):
+    """
+    Trainer for federated CLIP + LoRA fine-tuning (dLoRA AB_SVD).
+
+    The model must be a CLIP model with LoRA layers already injected.
+    All non-LoRA parameters are frozen on the first train() call.
+    """
+
+    def __init__(
+        self,
+        model=None,
+        loss_fn=None,
+        metric=None,
+        train_dataset: Optional[Dataset] = None,
+        val_dataset: Optional[Dataset] = None,
+        train_configs: DictConfig = DictConfig({}),
+        logger: Optional[Any] = None,
+        **kwargs,
+    ):
+        super().__init__(
+            model=model,
+            loss_fn=loss_fn,
+            metric=metric,
+            train_dataset=train_dataset,
+            val_dataset=val_dataset,
+            train_configs=train_configs,
+            logger=logger,
+            **kwargs,
+        )
+        self._lora_marked = False          # whether LoRA-only freeze has been applied
+        self._text_features_cache = None   # cached text features (vision-only training)
+        self._scaler = torch.amp.GradScaler()
+
+    # ------------------------------------------------------------------
+    # Public interface
+    # ------------------------------------------------------------------
+
+    def train(self, **kwargs):
+        """Run one FL round of local CLIP + LoRA training."""
+        if "round" in kwargs:
+            self.round = kwargs["round"]
+
+        # Freeze non-LoRA parameters once
+        if not self._lora_marked:
+            self._freeze_non_lora()
+            self._lora_marked = True
+
+        # Read training config
+        encoder = self.train_configs.get("encoder", "both")
+        freeze_a = self.train_configs.get("freeze_a", False)
+        logit_scale = float(self.train_configs.get("logit_scale", 100.0))
+        lr = float(self.train_configs.get("lr", 2e-4))
+        weight_decay = float(self.train_configs.get("weight_decay", 1e-2))
+        n_steps = int(
+            self.train_configs.get("num_local_steps", len(self.train_dataloader))
+        )
+        device = self.train_configs.get("device", "cuda")
+
+        # Classnames and template (from train_configs or dataset attributes)
+        classnames = self.train_configs.get("classnames", None)
+        template = self.train_configs.get("template", ["a photo of a {}."])
+        if classnames is None and hasattr(self.train_dataset, "classnames"):
+            classnames = self.train_dataset.classnames
+        if isinstance(template, str):
+            template = [template]
+        if hasattr(self.train_dataset, "template"):
+            template = self.train_dataset.template
+
+        if classnames is None:
+            raise ValueError(
+                "CLIPLoRATrainer requires 'classnames' in train_configs "
+                "or as an attribute of the train_dataset."
+            )
+
+        # Move model to device
+        self.model.to(device)
+        self.model.train()
+
+        # Precompute text features (cache when text encoder is frozen)
+        text_features = self._get_text_features(
+            classnames, template, encoder, device
+        )
+
+        # Optimizer and scheduler (re-created each round, matching VanillaTrainer)
+        lora_params = [
+            p for p in self.model.parameters() if p.requires_grad
+        ]
+        optimizer = torch.optim.AdamW(
+            lora_params,
+            lr=lr,
+            weight_decay=weight_decay,
+            betas=(0.9, 0.999),
+        )
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=n_steps, eta_min=1e-6
+        )
+
+        # Training loop
+        data_iter = iter(self.train_dataloader)
+        total_loss = 0.0
+        for _ in range(n_steps):
+            try:
+                images, targets = next(data_iter)
+            except StopIteration:
+                data_iter = iter(self.train_dataloader)
+                images, targets = next(data_iter)
+
+            images = images.to(device)
+            targets = targets.to(device)
+
+            optimizer.zero_grad()
+
+            # Encode text features (re-encode when text encoder is trainable)
+            if encoder in ("text", "both"):
+                text_features = self._encode_text(classnames, template, device)
+
+            # Encode image features
+            if encoder in ("vision", "both"):
+                with torch.amp.autocast("cuda", dtype=torch.float16):
+                    image_features = self.model.encode_image(images)
+            else:
+                with torch.no_grad():
+                    with torch.amp.autocast("cuda", dtype=torch.float16):
+                        image_features = self.model.encode_image(images)
+
+            image_features = image_features / image_features.norm(
+                dim=-1, keepdim=True
+            )
+
+            cosine_sim = logit_scale * image_features @ text_features.t()
+            loss = F.cross_entropy(cosine_sim.float(), targets)
+
+            self._scaler.scale(loss).backward()
+            self._scaler.step(optimizer)
+            self._scaler.update()
+            scheduler.step()
+
+            total_loss += loss.item()
+
+        if self.logger:
+            avg_loss = total_loss / n_steps
+            self.logger.info(
+                f"[CLIPLoRATrainer] Round {self.round} — "
+                f"avg loss: {avg_loss:.4f} over {n_steps} steps"
+            )
+
+        self.round += 1
+        self.model_state = copy.deepcopy(self.model.state_dict())
+
+    def get_parameters(self) -> Dict:
+        """Return the full model state dict (LoRA + frozen CLIP weights)."""
+        if not hasattr(self, "model_state"):
+            self.model_state = copy.deepcopy(self.model.state_dict())
+        return self.model_state
+
+    def load_parameters(
+        self,
+        params: Union[Dict, OrderedDict, Any],
+    ):
+        """Load aggregated global model parameters."""
+        self.model.load_state_dict(params, strict=False)
+        # Invalidate cached text features in case the text encoder changed
+        self._text_features_cache = None
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
+    def _freeze_non_lora(self):
+        """Freeze all parameters that do not belong to LoRA layers."""
+        freeze_a = self.train_configs.get("freeze_a", False)
+        for name, param in self.model.named_parameters():
+            if "lora_" not in name:
+                param.requires_grad = False
+            elif freeze_a and "w_lora_A" in name:
+                param.requires_grad = False
+            else:
+                param.requires_grad = True
+
+        trainable = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
+        if self.logger:
+            self.logger.info(
+                f"[CLIPLoRATrainer] Frozen non-LoRA params. "
+                f"Trainable parameters: {trainable:,}"
+            )
+
+    def _get_text_features(self, classnames, template, encoder, device):
+        """
+        Return (possibly cached) text feature matrix of shape (num_classes, D).
+        Features are cached only when the text encoder is frozen (vision-only).
+        """
+        if encoder == "vision" and self._text_features_cache is not None:
+            return self._text_features_cache
+
+        features = self._encode_text(classnames, template, device)
+
+        if encoder == "vision":
+            self._text_features_cache = features
+        return features
+
+    def _encode_text(self, classnames, template, device):
+        """Encode class names into normalised text feature vectors."""
+        import clip as clip_pkg
+
+        tmpl = template[0] if template else "a photo of a {}."
+        texts = [tmpl.format(c.replace("_", " ")) for c in classnames]
+
+        with torch.no_grad():
+            with torch.amp.autocast("cuda", dtype=torch.float16):
+                tokens = clip_pkg.tokenize(texts).to(device)
+                class_embeddings = self.model.encode_text(tokens)
+        text_features = class_embeddings / class_embeddings.norm(
+            dim=-1, keepdim=True
+        )
+        return text_features

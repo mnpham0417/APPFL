@@ -1,0 +1,30 @@
+client_id: "Client1"
+train_configs:
+  device: "cuda"
+  logging_output_dirname: "./output"
+  logging_output_filename: "result"
+
+# Local dataset configuration (CLIP benchmark, IID partition)
+data_configs:
+  dataset_path: "./resources/dataset/clip_lora_dataset.py"
+  dataset_name: "get_clip_lora_dataset"
+  dataset_kwargs:
+    # Dataset name — one of: caltech101, dtd, eurosat, fgvc, food101,
+    #   imagenet, oxford_flowers, oxford_pets, stanford_cars, sun397, ucf101
+    dataset_name: "dtd"
+    # Root directory where the raw dataset is stored
+    root_path: "/path/to/data"
+    shots: 16               # few-shot samples per class
+    backbone: "ViT-B/16"    # must match model_kwargs.backbone
+    num_clients: 5          # overridden by the MPI script
+    client_id: 0            # overridden per client by the MPI script
+    data_dist: "iid"        # "iid" or "non-iid"
+    seed: 1
+    # Set clip_lora_root to the absolute path of your clip_lora directory:
+    clip_lora_root: null    # e.g. "/path/to/clip_lora"
+
+comm_configs:
+  grpc_configs:
+    server_uri: localhost:50051
+    max_message_size: 1048576
+    use_ssl: False
