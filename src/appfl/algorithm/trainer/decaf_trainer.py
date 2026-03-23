@@ -76,6 +76,22 @@ class DeCaFTrainer(VanillaTrainer):
         self._text_features_cache = None   # cached text features (vision-only training)
         self._scaler = torch.amp.GradScaler()
 
+        # Re-create the train DataLoader with a seeded generator so that
+        # batch order is deterministic when torch.manual_seed() is set by
+        # the MPI launch script.  VanillaTrainer builds the loader without
+        # a generator, which makes shuffle non-deterministic across runs.
+        if self.train_dataset is not None:
+            _g = torch.Generator()
+            _g.manual_seed(torch.initial_seed())
+            from torch.utils.data import DataLoader
+            self.train_dataloader = DataLoader(
+                self.train_dataset,
+                batch_size=self.train_configs.get("train_batch_size", 32),
+                shuffle=self.train_configs.get("train_data_shuffle", True),
+                num_workers=self.train_configs.get("num_workers", 0),
+                generator=_g,
+            )
+
     # ------------------------------------------------------------------
     # Public interface
     # ------------------------------------------------------------------

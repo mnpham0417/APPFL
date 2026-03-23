@@ -35,8 +35,11 @@ Command-line arguments:
 
 import argparse
 import os
+import random
 import time
 
+import numpy as np
+import torch
 from mpi4py import MPI
 from omegaconf import OmegaConf
 
@@ -89,6 +92,17 @@ parser.add_argument(
         "Number of local gradient steps for pre-training before consensus. "
         "Default 0 (no pre-training). "
         "Requires train_configs.mode='step' in the client config."
+    ),
+)
+parser.add_argument(
+    "--seed",
+    type=int,
+    default=42,
+    help=(
+        "Global random seed for reproducibility. Controls PyTorch, NumPy, "
+        "Python random, and cuDNN determinism. Each MPI rank gets a "
+        "rank-offset seed (seed + rank) so clients start from different but "
+        "reproducible LoRA initializations."
     ),
 )
 args = parser.parse_args()
@@ -149,18 +163,31 @@ OUTPUT_DIR = os.path.join(
         f"_r{_lora_r}"
         f"_enc{_enc}"
         f"_lr{_fmt_lr(_lr_raw)}"
+        f"_seed{args.seed}"
         + (f"_pretrain{args.pretrain_steps}" if args.pretrain_steps > 0 else "")
     ),
 )
 
 # ---------------------------------------------------------------------------
-# MPI setup
+# MPI setup + reproducibility seeding
 # ---------------------------------------------------------------------------
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 num_clients = size - 1  # rank 0 is the server
+
+# Each rank gets a unique but reproducible seed so clients start from
+# different (but deterministic) LoRA initializations across runs.
+_rank_seed = args.seed + rank
+random.seed(_rank_seed)
+np.random.seed(_rank_seed)
+torch.manual_seed(_rank_seed)
+torch.cuda.manual_seed_all(_rank_seed)
+# Disable cuDNN auto-tuner and non-deterministic algorithms.
+# Costs ~5-10% throughput but makes results reproducible across runs.
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
 # ======================================================================
 # Server process (rank 0)

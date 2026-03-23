@@ -54,7 +54,6 @@ def mark_only_lora_as_trainable(model: nn.Module, bias: str = 'none', freeze_a: 
             if freeze_a and 'w_lora_A' in name:
                 # Freeze w_lora_A parameters if freeze_a is True
                 param.requires_grad = False
-                print(f"Frozen parameter: {name}")
             else:
                 # Keep LoRA parameters trainable
                 param.requires_grad = True
@@ -66,12 +65,10 @@ def mark_only_lora_as_trainable(model: nn.Module, bias: str = 'none', freeze_a: 
         for name, param in model.named_parameters():
             if 'bias' in name:
                 param.requires_grad = True
-                print(f"Unfrozen bias parameter: {name}")
     elif bias == 'lora_only':
         for module in model.modules():
             if isinstance(module, LoRALayer) and hasattr(module, 'bias') and module.bias is not None:
                 module.bias.requires_grad = True
-                print(f"Unfrozen bias in LoRALayer: {module}")
     else:
         raise NotImplementedError(f"Bias option '{bias}' is not implemented.")
 
@@ -122,7 +119,6 @@ def apply_lora(args, clip_model):
         indices = INDEX_POSITIONS_TEXT[args.position]
         text_encoder = clip_model.transformer
         for i, block in enumerate(text_encoder.resblocks):
-            print(f"Residual Attention Block {i}: {block}")
             if i in indices:
                 for name, submodule in block.named_children():
                     if isinstance(submodule, nn.MultiheadAttention):
@@ -135,7 +131,6 @@ def apply_lora(args, clip_model):
         indices = INDEX_POSITIONS_VISION[args.backbone][args.position]
         vision_encoder = clip_model.visual.transformer
         for i, block in enumerate(vision_encoder.resblocks):
-            print(f"Residual Attention Block {i}: {block}")
             if i in indices:
                 for name, submodule in block.named_children():
                     if isinstance(submodule, nn.MultiheadAttention):
