@@ -60,17 +60,16 @@ def CLIPLoRAModel(
     if params is None:
         params = ["q", "k", "v"]
 
-    # Add clip_lora to the Python path so loralib can be imported
-    if clip_lora_root is not None and clip_lora_root not in sys.path:
-        sys.path.insert(0, clip_lora_root)
-    else:
-        # Try a path relative to the project layout used in this repo
-        candidate = os.path.join(
-            os.path.dirname(__file__), "..", "..", "..", "..", "clip_lora"
-        )
-        candidate = os.path.abspath(candidate)
-        if os.path.isdir(candidate) and candidate not in sys.path:
-            sys.path.insert(0, candidate)
+    # Bundled clip/loralib/datasets packages live at resources/clip_lora/
+    # relative to this file (examples/resources/model/ -> ../clip_lora/).
+    # An explicit clip_lora_root arg is accepted for backwards-compatibility
+    # but is no longer required.
+    _bundled = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "clip_lora")
+    )
+    for _p in filter(None, [_bundled, clip_lora_root]):
+        if os.path.isdir(_p) and _p not in sys.path:
+            sys.path.insert(0, _p)
 
     import clip
     from loralib.utils import apply_lora

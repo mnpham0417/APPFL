@@ -165,18 +165,19 @@ def get_clip_lora_dataset(
 # ---------------------------------------------------------------------------
 
 def _add_clip_lora_to_path(clip_lora_root: Optional[str]):
-    """Insert clip_lora into sys.path so its packages are importable."""
-    if clip_lora_root is not None:
-        if clip_lora_root not in sys.path:
-            sys.path.insert(0, clip_lora_root)
-        return
+    """Insert clip_lora packages into sys.path so they are importable.
 
-    # Auto-detect based on expected repo layout
-    candidate = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "clip_lora")
+    Prefers the bundled copy at resources/clip_lora/ (relative to this file).
+    An explicit clip_lora_root is accepted for backwards-compatibility but is
+    no longer required.
+    """
+    # Bundled copy: examples/resources/dataset/ -> ../clip_lora/
+    _bundled = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "clip_lora")
     )
-    if os.path.isdir(candidate) and candidate not in sys.path:
-        sys.path.insert(0, candidate)
+    for _p in filter(None, [_bundled, clip_lora_root]):
+        if os.path.isdir(_p) and _p not in sys.path:
+            sys.path.insert(0, _p)
 
 
 def _partition(

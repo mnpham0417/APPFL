@@ -17,26 +17,16 @@ Two-phase execution:
     Phase 2: Consensus-training loop — local train → send LoRA params →
         receive AB_SVD-aggregated LoRA params → repeat.
 
-Usage (ring topology, 5 clients, Flowers-102):
-    mpirun -n 6 python run_mpi_decentralized_clip_lora.py \\
-        --server_config ./resources/configs/flower102/server_dlora_ab_svd_ring.yaml \\
-        --client_config ./resources/configs/flower102/client_dlora_ab_svd_decentralized.yaml \\
-        --clip_lora_root /path/to/clip_lora \\
-        --pretrain_steps 0
-
 Usage (FC topology, 5 clients, Flowers-102):
-    mpirun -n 6 python run_mpi_decentralized_clip_lora.py \\
-        --server_config ./resources/configs/flower102/server_dlora_ab_svd_fc.yaml \\
-        --client_config ./resources/configs/flower102/client_dlora_ab_svd_decentralized.yaml \\
-        --clip_lora_root /path/to/clip_lora \\
-        --pretrain_steps 0
+    mpirun --oversubscribe --bind-to none -n 6 python mpi/run_mpi_decentralized_clip_lora.py \\
+        --server_config resources/configs/clip_lora/server_decentralized_fc.yaml \\
+        --client_config resources/configs/clip_lora/client_decentralized_fc.yaml \\
+        --data_path /path/to/data
 
 Command-line arguments:
     --server_config    Path to server YAML config (selects topology + aggregator).
     --client_config    Path to shared client YAML config template.
-    --clip_lora_root   Absolute path to the clip_lora project directory.
-                       Overrides null values in both config files.
-    --data_path        Root path to the Flower102 dataset directory.
+    --data_path        Root data directory (parent of Flower102/).
     --shots            Few-shot samples per class (overrides client config).
     --data_dist        Data distribution: "iid" or "non-iid".
     --pretrain_steps   Number of local gradient steps before consensus begins.
@@ -71,12 +61,6 @@ parser.add_argument(
     type=str,
     default="./resources/configs/flower102/client_dlora_ab_svd_decentralized.yaml",
     help="Path to client configuration YAML (shared template).",
-)
-parser.add_argument(
-    "--clip_lora_root",
-    type=str,
-    default="/work/mech-ai-scratch/nsaadati/projects/dlora/others/CLIP-LoRA",
-    help="Absolute path to the clip_lora project directory.",
 )
 parser.add_argument(
     "--data_path",
@@ -176,13 +160,7 @@ else:
     client_agent_config.data_configs.dataset_kwargs.num_clients = num_clients
     client_agent_config.data_configs.dataset_kwargs.client_id = rank - 1
 
-    # Command-line overrides for clip_lora path and dataset parameters
-    if args.clip_lora_root is not None:
-        client_agent_config.data_configs.dataset_kwargs.clip_lora_root = (
-            args.clip_lora_root
-        )
-        # Also propagate to train_configs so CLIPLoRATrainer can find loralib
-        client_agent_config.train_configs["clip_lora_root"] = args.clip_lora_root
+    # Command-line overrides for dataset parameters
     if args.data_path is not None:
         client_agent_config.data_configs.dataset_kwargs.root_path = args.data_path
     if args.shots is not None:

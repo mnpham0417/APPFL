@@ -19,8 +19,6 @@ data_configs:
     client_id: 0            # overridden per client by the MPI script
     data_dist: "iid"        # "iid" or "non-iid" (overridden via --data_dist)
     seed: 1
-    # Set clip_lora_root to the absolute path of your clip_lora directory:
-    clip_lora_root: null    # overridden via --clip_lora_root CLI arg
 
 comm_configs:
   grpc_configs:

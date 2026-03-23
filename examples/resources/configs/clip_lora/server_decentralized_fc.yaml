@@ -34,8 +34,6 @@ client_configs:
       r: 2
       alpha: 1
       dropout_rate: 0.25
-      # Set clip_lora_root to the absolute path of your clip_lora directory:
-      clip_lora_root: null      # overridden via --clip_lora_root CLI arg
 
   comm_configs:
     compressor_configs:
