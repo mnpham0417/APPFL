@@ -1,0 +1,68 @@
+client_configs:
+  train_configs:
+    # CLIP + LoRA trainer with decentralized FC consensus (AB_SVD)
+    trainer: "CLIPLoRATrainer"
+    mode: "step"
+    num_local_steps: 1          # gradient steps per FL round
+    encoder: "both"             # "vision" | "text" | "both"
+    freeze_a: False             # freeze w_lora_A (set True for ablation)
+    lr: 2.0e-4
+    weight_decay: 1.0e-2
+    logit_scale: 100.0
+    # Data loader
+    train_batch_size: 32
+    val_batch_size: 64
+    train_data_shuffle: True
+    val_data_shuffle: False
+    # Logging
+    do_validation: False
+    do_pre_validation: False
+    # Device
+    device: "cuda"
+
+  model_configs:
+    model_path: "./resources/model/clip_lora_model.py"
+    model_name: "CLIPLoRAModel"
+    model_kwargs:
+      backbone: "ViT-B/16"
+      encoder: "both"
+      position: "all"
+      params: ["q", "k", "v"]
+      r: 2
+      alpha: 1
+      dropout_rate: 0.25
+      # Set clip_lora_root to the absolute path of your clip_lora directory:
+      clip_lora_root: null      # e.g. "/path/to/clip_lora"
+
+  comm_configs:
+    compressor_configs:
+      enable_compression: False
+      lossy_compressor: "SZ2Compressor"
+      lossless_compressor: "blosc"
+      error_bounding_mode: "REL"
+      error_bound: 1.0e-3
+      param_cutoff: 1024
+
+server_configs:
+  num_clients: 5
+  scheduler: "SyncScheduler"
+  scheduler_kwargs:
+    same_init_model: True
+  # Decentralized DLoRA AB_SVD: fully-connected consensus with AB_SVD aggregation
+  aggregator: "DecentralizedDLoRABSVDAggregator"
+  aggregator_kwargs:
+    # Fully connected: all agents average AB_SVD with equal weight 1/N
+    topology: "fc"
+    # SVD truncation rank — must match model_kwargs.r
+    lora_rank: 2
+    # "sample_size" weights by dataset size; "equal" uses uniform weights
+    client_weights_mode: "sample_size"
+    device: "cuda"
+  num_global_epochs: 200
+  logging_output_dirname: "./output"
+  logging_output_filename: "result_flower102_dlora_ab_svd_fc"
+  comm_configs:
+    grpc_configs:
+      server_uri: localhost:50051
+      max_message_size: 1048576
+      use_ssl: False

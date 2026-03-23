@@ -1,41 +1,41 @@
 """
-CLIP + LoRA dataset loader for dLoRA AB_SVD federated experiments.
+Flower102 dataset loader for decentralized CLIP + LoRA experiments.
 
-Wraps clip_lora's dataset infrastructure to produce per-client
-torch.utils.data.Dataset objects compatible with APPFL's data pipeline.
+Uses clip_lora's dataset infrastructure (datasets.build_dataset) to load the
+Oxford Flowers-102 dataset with CLIP preprocessing.  The returned dataset
+objects carry two extra attributes read by CLIPLoRATrainer:
 
-Supports all clip_lora benchmark datasets:
-    caltech101, dtd, eurosat, fgvc, food101, imagenet,
-    oxford_flowers, oxford_pets, stanford_cars, sun397, ucf101.
-
-The returned dataset objects carry two extra attributes that
-CLIPLoRATrainer reads to build text features:
-    .classnames (list[str]): human-readable class labels.
+    .classnames (list[str]): 102 human-readable flower class names.
     .template   (list[str]): text template(s), e.g. ["a photo of a {}."]
 
-IID partitioning: each client receives a class-balanced subset of the
-few-shot training data (matching clip_lora's dlora_data.py logic).
+Reads the Zhou-split (split_zhou_OxfordFlowers.json) via clip_lora's own
+Flowers-102 dataset class, so the few-shot ``shots`` sampling is identical to
+the non-federated clip_lora baseline.
 
-Non-IID partitioning: classes are split across clients; each client
-exclusively owns certain classes.
+IID partitioning:
+    Each class is divided evenly across all clients.  Every client gets a
+    proportional share of every class (class-balanced).
 
-Usage in client_dlora_ab_svd.yaml:
-    data_configs:
-      dataset_path: "./resources/dataset/clip_lora_dataset.py"
-      dataset_name: "get_clip_lora_dataset"
-      dataset_kwargs:
-        dataset_name: "dtd"
-        root_path: "/path/to/data"
-        shots: 16
-        backbone: "ViT-B/16"
-        num_clients: 5
-        client_id: 0          # overridden per client by MPI script
-        data_dist: "iid"
-        clip_lora_root: "/path/to/clip_lora"
+Non-IID partitioning:
+    Classes are assigned exclusively to individual clients via round-robin.
+
+Args to get_flower102_clip_lora():
+    data_path      (str) : path to the Flower102 root directory.
+    backbone       (str) : CLIP backbone string, e.g. "ViT-B/16".
+    shots          (int) : few-shot samples per class (default 16).
+    num_clients    (int) : total number of FL clients.
+    client_id      (int) : 0-based index of this client.
+    data_dist      (str) : "iid" (default) or "non-iid".
+    seed           (int) : random seed for partitioning (default 1).
+    clip_lora_root (str) : absolute path to the clip_lora project directory.
+
+Returns:
+    (train_dataset, val_dataset) — both are _CLIPDatasetWrapper instances
+    that expose .classnames and .template.
 """
 
-import sys
 import os
+import sys
 import random
 from collections import defaultdict
 from typing import List, Optional
@@ -54,8 +54,8 @@ class _CLIPDatasetWrapper(Dataset):
     Wraps a list of clip_lora Datum objects into a standard
     (image, label) torch Dataset with CLIP preprocessing.
 
-    Extra attributes:
-        classnames (list[str]): class labels.
+    Extra attributes read by CLIPLoRATrainer:
+        classnames (list[str]): human-readable class labels.
         template   (list[str]): text template strings.
     """
 
@@ -80,47 +80,42 @@ class _CLIPDatasetWrapper(Dataset):
 # Public factory function
 # ---------------------------------------------------------------------------
 
-def get_clip_lora_dataset(
-    dataset_name: str,
-    root_path: str,
-    shots: int,
-    backbone: str,
-    num_clients: int,
-    client_id: int,
+def get_flower102_clip_lora(
+    data_path: str,
+    backbone: str = "ViT-B/16",
+    shots: int = 16,
+    num_clients: int = 5,
+    client_id: int = 0,
     data_dist: str = "iid",
-    clip_lora_root: Optional[str] = None,
     seed: int = 1,
+    clip_lora_root: Optional[str] = None,
     **kwargs,
 ):
     """
-    Return (train_dataset, val_dataset) for a given client.
+    Return (train_dataset, val_dataset) for the given Flower102 client.
 
-    The train_dataset is an IID or non-IID partition of the few-shot
-    training split.  The val_dataset is the full validation split
-    (shared across all clients for evaluation).
+    Parameters
+    ----------
+    data_path      : Root directory of the Flower102 dataset.
+    backbone       : CLIP backbone (must match model_kwargs.backbone).
+    shots          : Few-shot samples per class.
+    num_clients    : Total number of federated clients.
+    client_id      : Zero-based index of this client.
+    data_dist      : "iid" or "non-iid".
+    seed           : Random seed for partitioning.
+    clip_lora_root : Path to the clip_lora project directory.
 
-    Args:
-        dataset_name:   One of the clip_lora benchmark names.
-        root_path:      Root directory where raw datasets are stored.
-        shots:          Number of few-shot training samples per class.
-        backbone:       CLIP backbone string (for CLIP preprocessing).
-        num_clients:    Total number of federated clients.
-        client_id:      Zero-based index of this client.
-        data_dist:      "iid" or "non-iid".
-        clip_lora_root: Path to the clip_lora project directory.
-        seed:           Random seed for data partitioning.
-
-    Returns:
-        (train_subset, val_dataset): both are _CLIPDatasetWrapper instances.
+    Returns
+    -------
+    (train_subset, val_dataset) : both are _CLIPDatasetWrapper instances.
     """
-    # --- Ensure clip_lora is importable ---
     _add_clip_lora_to_path(clip_lora_root)
 
     import clip
     from datasets import build_dataset
     import torchvision.transforms as transforms
 
-    # CLIP image preprocessing (training augmentation)
+    # CLIP training augmentation
     train_transform = transforms.Compose(
         [
             transforms.RandomResizedCrop(
@@ -137,16 +132,17 @@ def get_clip_lora_dataset(
         ]
     )
 
-    # CLIP val/test preprocessing (from clip.load's default preprocess)
+    # CLIP val/test preprocessing
     _, clip_preprocess = clip.load(backbone, device="cpu")
 
-    # Build the full dataset using clip_lora's infrastructure
-    full_dataset = build_dataset(dataset_name, root_path, shots, clip_preprocess)
+    # Build the full Flowers-102 dataset via clip_lora infrastructure
+    # dataset_name "oxford_flowers" maps to Flowers102 in clip_lora's registry
+    full_dataset = build_dataset("oxford_flowers", data_path, shots, clip_preprocess)
 
     classnames = full_dataset.classnames
     template = full_dataset.template
 
-    # --- Partition training data ---
+    # Partition training data for this client
     train_x = full_dataset.train_x  # list of Datum objects
     client_data = _partition(train_x, num_clients, client_id, data_dist, seed)
 
@@ -171,7 +167,7 @@ def _add_clip_lora_to_path(clip_lora_root: Optional[str]):
             sys.path.insert(0, clip_lora_root)
         return
 
-    # Auto-detect based on expected repo layout
+    # Auto-detect based on expected repo layout relative to this file
     candidate = os.path.abspath(
         os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "clip_lora")
     )
@@ -180,7 +176,7 @@ def _add_clip_lora_to_path(clip_lora_root: Optional[str]):
 
 
 def _partition(
-    data_source,
+    data_source: list,
     num_clients: int,
     client_id: int,
     data_dist: str,
@@ -189,9 +185,9 @@ def _partition(
     """
     Partition data_source (list of Datum) for a single client.
 
-    IID:     Each class is split evenly across all clients.
+    IID:     Each class is divided evenly across all clients (class-balanced).
     Non-IID: Classes are assigned exclusively to individual clients
-             (round-robin over shuffled class list).
+             via round-robin over a shuffled class list.
     """
     rng = random.Random(seed)
 

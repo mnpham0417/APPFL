@@ -91,7 +91,12 @@ class CLIPLoRATrainer(VanillaTrainer):
         # Read training config
         encoder = self.train_configs.get("encoder", "both")
         freeze_a = self.train_configs.get("freeze_a", False)
-        logit_scale = float(self.train_configs.get("logit_scale", 100.0))
+        # Use the model's learned logit_scale (clamped to CLIP's safe range)
+        # rather than a fixed config value — 100.0 overflows fp16 gradients.
+        if hasattr(self.model, "logit_scale"):
+            logit_scale = self.model.logit_scale.exp().item()
+        else:
+            logit_scale = float(self.train_configs.get("logit_scale", 100.0))
         lr = float(self.train_configs.get("lr", 2e-4))
         weight_decay = float(self.train_configs.get("weight_decay", 1e-2))
         n_steps = int(
@@ -187,14 +192,29 @@ class CLIPLoRATrainer(VanillaTrainer):
                 f"avg loss: {avg_loss:.4f} over {n_steps} steps"
             )
 
+        # Optional per-round validation
+        if self.train_configs.get("do_validation", False) and self.val_dataset is not None:
+            acc = self._validate(classnames, template, device, logit_scale)
+            if self.logger:
+                self.logger.info(
+                    f"[CLIPLoRATrainer] Round {self.round} — val accuracy: {acc:.2f}%"
+                )
+
         self.round += 1
         self.model_state = copy.deepcopy(self.model.state_dict())
 
     def get_parameters(self) -> Dict:
-        """Return the full model state dict (LoRA + frozen CLIP weights)."""
-        if not hasattr(self, "model_state"):
-            self.model_state = copy.deepcopy(self.model.state_dict())
-        return self.model_state
+        """Return only the LoRA parameters (w_lora_A / w_lora_B tensors).
+
+        Sending only the trainable LoRA parameters (~720KB) instead of the
+        full model state dict (~600MB) reduces communication and aggregation
+        memory by ~800x per client.
+        """
+        return {
+            k: v.detach().cpu()
+            for k, v in self.model.state_dict().items()
+            if "lora_" in k
+        }
 
     def load_parameters(
         self,
@@ -208,6 +228,35 @@ class CLIPLoRATrainer(VanillaTrainer):
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
+
+    @torch.no_grad()
+    def _validate(self, classnames, template, device, logit_scale) -> float:
+        """Compute top-1 accuracy on the validation set. Returns accuracy in %."""
+        self.model.eval()
+        val_loader = DataLoader(
+            self.val_dataset,
+            batch_size=int(self.train_configs.get("val_batch_size", 64)),
+            shuffle=False,
+            num_workers=0,
+        )
+        # Build text features once
+        text_features = self._encode_text(classnames, template, device)
+
+        correct = 0
+        total = 0
+        for images, targets in val_loader:
+            images = images.to(device)
+            targets = targets.to(device)
+            with torch.amp.autocast("cuda", dtype=torch.float16):
+                image_features = self.model.encode_image(images)
+            image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+            logits = logit_scale * image_features @ text_features.t()
+            preds = logits.argmax(dim=-1)
+            correct += (preds == targets).sum().item()
+            total += targets.size(0)
+
+        self.model.train()
+        return 100.0 * correct / total if total > 0 else 0.0
 
     def _freeze_non_lora(self):
         """Freeze all parameters that do not belong to LoRA layers."""

@@ -1,0 +1,29 @@
+client_id: "Client1"
+train_configs:
+  device: "cuda"
+  logging_output_dirname: "./output"
+  logging_output_filename: "result_decentralized_fc"
+
+# Local dataset configuration (CLIP benchmark, oxford_flowers / Flower102)
+data_configs:
+  dataset_path: "./resources/dataset/clip_lora_dataset.py"
+  dataset_name: "get_clip_lora_dataset"
+  dataset_kwargs:
+    # oxford_flowers = Flowers-102 benchmark
+    dataset_name: "oxford_flowers"
+    # Root directory where the raw dataset is stored (overridden via --data_path)
+    root_path: null
+    shots: 40               # few-shot samples per class (overridden via --shots)
+    backbone: "ViT-B/16"    # must match model_kwargs.backbone
+    num_clients: 5          # overridden by the MPI script
+    client_id: 0            # overridden per client by the MPI script
+    data_dist: "iid"        # "iid" or "non-iid" (overridden via --data_dist)
+    seed: 1
+    # Set clip_lora_root to the absolute path of your clip_lora directory:
+    clip_lora_root: null    # overridden via --clip_lora_root CLI arg
+
+comm_configs:
+  grpc_configs:
+    server_uri: localhost:50051
+    max_message_size: 1048576
+    use_ssl: False

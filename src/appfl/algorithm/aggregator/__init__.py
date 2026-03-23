@@ -30,6 +30,11 @@ try:
 except:  # noqa: E722
     pass
 
+try:
+    from .decentralized_dlora_ab_svd_aggregator import DecentralizedDLoRABSVDAggregator
+except:  # noqa: E722
+    pass
+
 __all__ = [
     "BaseAggregator",
     "FedAvgAggregator",
@@ -46,4 +51,5 @@ __all__ = [
     "DIMATaggregator",
     "DLoRABSVDAggregator",
     "DecentralizedAggregator",
+    "DecentralizedDLoRABSVDAggregator",
 ]
