@@ -95,21 +95,62 @@ args = parser.parse_args()
 
 # ---------------------------------------------------------------------------
 # Build results output path from args + config names
-# Structure: ./results/<config_stem>/<data_dist>_shots<shots>/
-#   config_stem — server config filename without extension (encodes topology)
-#   data_dist   — iid / non-iid
-#   shots       — few-shot samples per class
+# Structure:
+#   results/<config_stem>/
+#     <data_dist>_shots<S>_clients<N>_rnd<R>_ls<LS>_r<LORA_R>_enc<ENC>_lr<LR>/
+#
+#   config_stem  — server config filename (encodes topology)
+#   data_dist    — iid / non-iid
+#   shots        — few-shot samples per class        (CLI --shots)
+#   clients      — number of FL clients             (MPI size - 1)
+#   rnd          — total FL rounds                  (num_global_epochs)
+#   ls           — local gradient steps per round   (num_local_steps)
+#   r            — LoRA rank                        (model_kwargs.r)
+#   enc          — which encoder(s) are trained     (train_configs.encoder)
+#   lr           — AdamW learning rate              (train_configs.lr)
 # ---------------------------------------------------------------------------
 
 _config_stem = os.path.splitext(os.path.basename(args.server_config))[0]
-# Strip leading "server_" prefix if present for brevity
 if _config_stem.startswith("server_"):
     _config_stem = _config_stem[len("server_"):]
+
+# Load server config once (read-only) to extract hyperparams for the path.
+# This is safe to do before the MPI rank split.
+_cfg = OmegaConf.load(args.server_config)
+_tc  = _cfg.get("client_configs", {}).get("train_configs", {})
+_mk  = _cfg.get("client_configs", {}).get("model_configs", {}).get("model_kwargs", {})
+_sc  = _cfg.get("server_configs", {})
+
+_rounds    = _sc.get("num_global_epochs", "?")
+_ls        = _tc.get("num_local_steps", "?")
+_lora_r    = _mk.get("r", "?")
+_enc       = _tc.get("encoder", "both")
+_lr_raw    = _tc.get("lr", "?")
+# Format lr compactly: 0.0002 → "2e-4", 0.001 → "1e-3"
+def _fmt_lr(v):
+    try:
+        f = float(v)
+        s = f"{f:.0e}"               # e.g. "2e-04"
+        s = s.replace("e-0", "e-").replace("e+0", "e")  # "2e-4"
+        return s
+    except Exception:
+        return str(v)
+
+_num_clients = MPI.COMM_WORLD.Get_size() - 1  # must import MPI first
 
 OUTPUT_DIR = os.path.join(
     "results",
     _config_stem,
-    f"{args.data_dist}_shots{args.shots}",
+    (
+        f"{args.data_dist}_shots{args.shots}"
+        f"_clients{_num_clients}"
+        f"_rnd{_rounds}"
+        f"_ls{_ls}"
+        f"_r{_lora_r}"
+        f"_enc{_enc}"
+        f"_lr{_fmt_lr(_lr_raw)}"
+        + (f"_pretrain{args.pretrain_steps}" if args.pretrain_steps > 0 else "")
+    ),
 )
 
 # ---------------------------------------------------------------------------

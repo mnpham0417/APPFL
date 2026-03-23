@@ -60,7 +60,7 @@ server_configs:
     client_weights_mode: "equal"
     # Device for SVD computation (cpu avoids GPU OOM when clients share the same GPU)
     device: "cpu"
-  num_global_epochs: 10       # total FL communication rounds
+  num_global_epochs: 500       # total FL communication rounds
   logging_output_dirname: "./output"
   logging_output_filename: "result_decaf_ring"
   comm_configs:
