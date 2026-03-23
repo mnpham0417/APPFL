@@ -62,7 +62,7 @@ server_configs:
     client_weights_mode: "sample_size"
     # Device for SVD computation (cpu avoids GPU OOM when clients share the same GPU)
     device: "cpu"
-  num_global_epochs: 100       # total FL communication rounds
+  num_global_epochs: 10       # total FL communication rounds
   logging_output_dirname: "./output"
   logging_output_filename: "result_decentralized_fc"
   comm_configs:

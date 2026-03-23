@@ -32,6 +32,8 @@ Optional train_configs keys:
 """
 
 import copy
+import csv
+import os
 import torch
 import torch.nn.functional as F
 from omegaconf import DictConfig
@@ -180,19 +182,26 @@ class CLIPLoRATrainer(VanillaTrainer):
 
             self._scaler.scale(loss).backward()
             self._scaler.step(optimizer)
+            scale_before = self._scaler.get_scale()
             self._scaler.update()
-            scheduler.step()
+            # Only advance LR schedule when the optimizer actually stepped
+            # (scaler skips the step when fp16 gradients overflow, in which
+            # case the scale is reduced; stepping the scheduler then would
+            # trigger a PyTorch warning and waste an LR decay tick).
+            if self._scaler.get_scale() >= scale_before:
+                scheduler.step()
 
             total_loss += loss.item()
 
+        avg_loss = total_loss / n_steps
         if self.logger:
-            avg_loss = total_loss / n_steps
             self.logger.info(
                 f"[CLIPLoRATrainer] Round {self.round} — "
                 f"avg loss: {avg_loss:.4f} over {n_steps} steps"
             )
 
         # Optional per-round validation
+        acc = None
         if self.train_configs.get("do_validation", False) and self.val_dataset is not None:
             acc = self._validate(classnames, template, device, logit_scale)
             if self.logger:
@@ -202,6 +211,35 @@ class CLIPLoRATrainer(VanillaTrainer):
 
         self.round += 1
         self.model_state = copy.deepcopy(self.model.state_dict())
+
+        # ── Persist last checkpoint and accuracy log ──────────────────────
+        output_dir = self.train_configs.get("logging_output_dirname", "./output")
+        client_name = getattr(self, "client_id", None) or "client"
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Overwrite single checkpoint file with current LoRA params
+        ckpt_path = os.path.join(output_dir, f"checkpoint_{client_name}.pt")
+        torch.save(
+            {
+                "round": self.round,
+                "lora_state_dict": {
+                    k: v.detach().cpu()
+                    for k, v in self.model.state_dict().items()
+                    if "lora_" in k
+                },
+            },
+            ckpt_path,
+        )
+
+        # Append one row per round to a per-client CSV
+        if acc is not None:
+            csv_path = os.path.join(output_dir, f"accuracy_{client_name}.csv")
+            write_header = not os.path.exists(csv_path)
+            with open(csv_path, "a", newline="") as f:
+                writer = csv.writer(f)
+                if write_header:
+                    writer.writerow(["round", "val_accuracy_pct", "avg_loss"])
+                writer.writerow([self.round, f"{acc:.4f}", f"{avg_loss:.4f}"])
 
     def get_parameters(self) -> Dict:
         """Return only the LoRA parameters (w_lora_A / w_lora_B tensors).

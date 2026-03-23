@@ -44,6 +44,7 @@ Command-line arguments:
 """
 
 import argparse
+import os
 import time
 
 from mpi4py import MPI
@@ -109,6 +110,25 @@ parser.add_argument(
 args = parser.parse_args()
 
 # ---------------------------------------------------------------------------
+# Build results output path from args + config names
+# Structure: ./results/<config_stem>/<data_dist>_shots<shots>/
+#   config_stem — server config filename without extension (encodes topology)
+#   data_dist   — iid / non-iid
+#   shots       — few-shot samples per class
+# ---------------------------------------------------------------------------
+
+_config_stem = os.path.splitext(os.path.basename(args.server_config))[0]
+# Strip leading "server_" prefix if present for brevity
+if _config_stem.startswith("server_"):
+    _config_stem = _config_stem[len("server_"):]
+
+OUTPUT_DIR = os.path.join(
+    "results",
+    _config_stem,
+    f"{args.data_dist}_shots{args.shots}",
+)
+
+# ---------------------------------------------------------------------------
 # MPI setup
 # ---------------------------------------------------------------------------
 
@@ -124,6 +144,8 @@ num_clients = size - 1  # rank 0 is the server
 if rank == 0:
     server_agent_config = OmegaConf.load(args.server_config)
     server_agent_config.server_configs.num_clients = num_clients
+    server_agent_config.server_configs.logging_output_dirname = OUTPUT_DIR
+    server_agent_config.client_configs.train_configs.logging_output_dirname = OUTPUT_DIR
 
     # Propagate lora_rank from model_kwargs.r to aggregator_kwargs if not
     # already set explicitly, ensuring SVD rank matches the client LoRA rank.
@@ -148,6 +170,7 @@ if rank == 0:
 else:
     client_agent_config = OmegaConf.load(args.client_config)
     client_agent_config.client_id = f"Client{rank}"
+    client_agent_config.train_configs.logging_output_dirname = OUTPUT_DIR
 
     # Per-client partitioning indices
     client_agent_config.data_configs.dataset_kwargs.num_clients = num_clients
