@@ -2,12 +2,12 @@ client_id: "Client1"
 train_configs:
   device: "cuda"
   logging_output_dirname: "./output"
-  logging_output_filename: "result_decentralized_fc"
+  logging_output_filename: "result_decaf_ring"
 
 # Local dataset configuration (CLIP benchmark, oxford_flowers / Flower102)
 data_configs:
-  dataset_path: "./resources/dataset/clip_lora_dataset.py"
-  dataset_name: "get_clip_lora_dataset"
+  dataset_path: "./resources/dataset/decaf_dataset.py"
+  dataset_name: "get_decaf_dataset"
   dataset_kwargs:
     # oxford_flowers = Flowers-102 benchmark
     dataset_name: "oxford_flowers"

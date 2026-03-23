@@ -3,7 +3,7 @@ CLIP + LoRA model for dLoRA AB_SVD federated experiments.
 
 Loads a CLIP backbone and injects LoRA layers into the specified
 attention projections, returning the modified CLIP model ready for
-federated fine-tuning with CLIPLoRATrainer.
+federated fine-tuning with DeCaFTrainer.
 
 Model kwargs (all optional, defaults match clip_lora/run_utils.py):
     backbone      (str):        CLIP backbone name.  Default: "ViT-B/16".
@@ -24,7 +24,7 @@ import sys
 import os
 
 
-def CLIPLoRAModel(
+def DeCaFModel(
     backbone: str = "ViT-B/16",
     encoder: str = "both",
     position: str = "all",
@@ -40,7 +40,7 @@ def CLIPLoRAModel(
 
     The returned model contains all original CLIP parameters (frozen
     by default) plus the trainable LoRA matrices.  The trainer
-    (CLIPLoRATrainer) will call mark_only_lora_as_trainable on the
+    (DeCaFTrainer) will call mark_only_lora_as_trainable on the
     first training round.
 
     Args:

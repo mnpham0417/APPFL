@@ -150,7 +150,9 @@ class DecentralizedDLoRABSVDAggregator(BaseAggregator):
         Ring topology consensus: each client gets the AB_SVD aggregate of
         its own model plus its two ring neighbors (weight = 1/3 each).
         """
-        client_ids = list(local_models.keys())
+        # Sort so the ring order is deterministic across rounds regardless
+        # of which client sends its update first.
+        client_ids = sorted(local_models.keys())
         num_agents = len(client_ids)
         pi = self._build_ring_pi(num_agents)  # list of {j_idx: weight}
 

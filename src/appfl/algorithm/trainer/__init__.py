@@ -20,7 +20,7 @@ except:  # noqa: E722
     pass
 
 try:
-    from .clip_lora_trainer import CLIPLoRATrainer
+    from .decaf_trainer import DeCaFTrainer
 except:  # noqa: E722
     pass
 
@@ -38,6 +38,6 @@ __all__ = [
     "FedSBTrainer",
     "LLMDummyTrainer",
     "DIMATTrainer",
-    "CLIPLoRATrainer",
+    "DeCaFTrainer",
     "DecentralizedTrainer",
 ]

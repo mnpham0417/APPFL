@@ -1,10 +1,10 @@
 """
-CLIPLoRATrainer: Client-side trainer for federated CLIP + LoRA fine-tuning.
+DeCaFTrainer: Client-side trainer for federated CLIP + LoRA fine-tuning.
 
 Extends VanillaTrainer to handle CLIP's dual-encoder architecture and
 LoRA-specific parameter management.  The model passed in must be a CLIP
 model with LoRA layers already applied (via the model file at
-examples/resources/model/clip_lora_model.py).
+examples/resources/model/decaf_model.py).
 
 Key differences from VanillaTrainer:
   - Freezes all non-LoRA parameters once (on first train() call).
@@ -43,7 +43,7 @@ from torch.utils.data import Dataset, DataLoader
 from appfl.algorithm.trainer.vanilla_trainer import VanillaTrainer
 
 
-class CLIPLoRATrainer(VanillaTrainer):
+class DeCaFTrainer(VanillaTrainer):
     """
     Trainer for federated CLIP + LoRA fine-tuning (dLoRA AB_SVD).
 
@@ -118,7 +118,7 @@ class CLIPLoRATrainer(VanillaTrainer):
 
         if classnames is None:
             raise ValueError(
-                "CLIPLoRATrainer requires 'classnames' in train_configs "
+                "DeCaFTrainer requires 'classnames' in train_configs "
                 "or as an attribute of the train_dataset."
             )
 
@@ -196,7 +196,7 @@ class CLIPLoRATrainer(VanillaTrainer):
         avg_loss = total_loss / n_steps
         if self.logger:
             self.logger.info(
-                f"[CLIPLoRATrainer] Round {self.round} — "
+                f"[DeCaFTrainer] Round {self.round} — "
                 f"avg loss: {avg_loss:.4f} over {n_steps} steps"
             )
 
@@ -206,7 +206,7 @@ class CLIPLoRATrainer(VanillaTrainer):
             acc = self._validate(classnames, template, device, logit_scale)
             if self.logger:
                 self.logger.info(
-                    f"[CLIPLoRATrainer] Round {self.round} — val accuracy: {acc:.2f}%"
+                    f"[DeCaFTrainer] Round {self.round} — val accuracy: {acc:.2f}%"
                 )
 
         self.round += 1
@@ -312,7 +312,7 @@ class CLIPLoRATrainer(VanillaTrainer):
         )
         if self.logger:
             self.logger.info(
-                f"[CLIPLoRATrainer] Frozen non-LoRA params. "
+                f"[DeCaFTrainer] Frozen non-LoRA params. "
                 f"Trainable parameters: {trainable:,}"
             )
 

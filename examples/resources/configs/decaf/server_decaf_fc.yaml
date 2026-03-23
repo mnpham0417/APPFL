@@ -1,7 +1,7 @@
 client_configs:
   train_configs:
     # CLIP + LoRA trainer (handles dual-encoder forward pass and LoRA freezing)
-    trainer: "CLIPLoRATrainer"
+    trainer: "DeCaFTrainer"
     # Step-based training: each FL round runs num_local_steps gradient steps
     mode: "step"
     num_local_steps: 25         # steps per round (~1 epoch over 816 samples / batch 32)
@@ -24,8 +24,8 @@ client_configs:
 
   model_configs:
     # CLIP + LoRA model (loads CLIP backbone and injects LoRA layers)
-    model_path: "./resources/model/clip_lora_model.py"
-    model_name: "CLIPLoRAModel"
+    model_path: "./resources/model/decaf_model.py"
+    model_name: "DeCaFModel"
     model_kwargs:
       backbone: "ViT-B/16"
       encoder: "both"
@@ -62,7 +62,7 @@ server_configs:
     device: "cpu"
   num_global_epochs: 10       # total FL communication rounds
   logging_output_dirname: "./output"
-  logging_output_filename: "result_decentralized_fc"
+  logging_output_filename: "result_decaf_fc"
   comm_configs:
     grpc_configs:
       server_uri: localhost:50051

@@ -9,7 +9,7 @@ Implements decentralized federated learning where:
       "fc"   — all agents aggregate globally (weight 1/N or sample-size).
 
 This mirrors how DiMAT was integrated into APPFL for decentralized learning,
-but uses CLIPLoRATrainer + DecentralizedDLoRABSVDAggregator instead.
+but uses DeCaFTrainer + DecentralizedDLoRABSVDAggregator instead.
 
 Two-phase execution:
     Phase 1 (optional): Each client pre-trains its CLIP+LoRA model independently
@@ -18,9 +18,9 @@ Two-phase execution:
         receive AB_SVD-aggregated LoRA params → repeat.
 
 Usage (FC topology, 5 clients, Flowers-102):
-    mpirun --oversubscribe --bind-to none -n 6 python mpi/run_mpi_decentralized_clip_lora.py \\
-        --server_config resources/configs/clip_lora/server_decentralized_fc.yaml \\
-        --client_config resources/configs/clip_lora/client_decentralized_fc.yaml \\
+    mpirun --oversubscribe --bind-to none -n 6 python mpi/run_mpi_decaf.py \\
+        --server_config resources/configs/decaf/server_decaf_fc.yaml \\
+        --client_config resources/configs/decaf/client_decaf_fc.yaml \\
         --data_path /path/to/data
 
 Command-line arguments:
@@ -53,13 +53,13 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "--server_config",
     type=str,
-    default="./resources/configs/flower102/server_dlora_ab_svd_ring.yaml",
+    default="./resources/configs/decaf/server_decaf_fc.yaml",
     help="Path to server/shared configuration YAML (selects topology).",
 )
 parser.add_argument(
     "--client_config",
     type=str,
-    default="./resources/configs/flower102/client_dlora_ab_svd_decentralized.yaml",
+    default="./resources/configs/decaf/client_decaf_fc.yaml",
     help="Path to client configuration YAML (shared template).",
 )
 parser.add_argument(

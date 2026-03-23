@@ -9,7 +9,7 @@ Supports all clip_lora benchmark datasets:
     oxford_flowers, oxford_pets, stanford_cars, sun397, ucf101.
 
 The returned dataset objects carry two extra attributes that
-CLIPLoRATrainer reads to build text features:
+DeCaFTrainer reads to build text features:
     .classnames (list[str]): human-readable class labels.
     .template   (list[str]): text template(s), e.g. ["a photo of a {}."]
 
@@ -19,10 +19,10 @@ few-shot training data (matching clip_lora's dlora_data.py logic).
 Non-IID partitioning: classes are split across clients; each client
 exclusively owns certain classes.
 
-Usage in client_dlora_ab_svd.yaml:
+Usage in client_decaf_fc.yaml:
     data_configs:
-      dataset_path: "./resources/dataset/clip_lora_dataset.py"
-      dataset_name: "get_clip_lora_dataset"
+      dataset_path: "./resources/dataset/decaf_dataset.py"
+      dataset_name: "get_decaf_dataset"
       dataset_kwargs:
         dataset_name: "dtd"
         root_path: "/path/to/data"
@@ -80,7 +80,7 @@ class _CLIPDatasetWrapper(Dataset):
 # Public factory function
 # ---------------------------------------------------------------------------
 
-def get_clip_lora_dataset(
+def get_decaf_dataset(
     dataset_name: str,
     root_path: str,
     shots: int,
