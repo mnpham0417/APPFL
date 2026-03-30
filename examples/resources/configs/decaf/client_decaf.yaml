@@ -1,0 +1,21 @@
+client_id: "Client1"
+train_configs:
+  device: "cuda"
+  logging_output_dirname: "./output"
+  logging_output_filename: "result_decaf"
+
+# Local dataset configuration — point to any APPFL-compatible dataset loader.
+# num_clients and client_id are overridden automatically by the MPI script.
+data_configs:
+  dataset_path: "./resources/dataset/YOUR_DATASET.py"
+  dataset_name: "get_your_dataset"
+  dataset_kwargs:
+    num_clients: 5    # overridden by MPI script
+    client_id: 0      # overridden by MPI script
+    shots: 40         # few-shot samples per class (overridden via --shots)
+
+comm_configs:
+  grpc_configs:
+    server_uri: localhost:50051
+    max_message_size: 1048576
+    use_ssl: False
