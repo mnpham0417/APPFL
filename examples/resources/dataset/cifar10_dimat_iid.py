@@ -1,7 +1,7 @@
 """
-CIFAR-100 dataset for DIMAT experiments.
-Uses lazy transforms (applied on each __getitem__ call) and class-balanced
-IID partitioning matching the original DIMAT codebase.
+CIFAR-10 dataset for DIMAT experiments with IID (class-balanced) partitioning.
+Uses lazy transforms (applied on each __getitem__ call) matching the CIFAR-100
+DIMAT setup.
 """
 
 import numpy as np
@@ -10,22 +10,21 @@ import torchvision.transforms as transforms
 from torch.utils.data import Subset
 
 
-def get_cifar100(
+def get_cifar10(
     num_clients: int,
     client_id: int,
     **kwargs,
 ):
     """
-    Return the CIFAR-100 dataset for a given client with paper-matching
-    normalization. IID partition distributes each class equally across clients,
-    matching the original DIMAT DataPartition logic.
+    Return the CIFAR-10 dataset for a given client with paper-matching
+    normalization. IID partition distributes each class equally across clients.
     """
     import os
 
     dir = os.getcwd() + "/datasets/RawData"
 
     cifar_mean = [0.4914, 0.4822, 0.4465]
-    cifar_std = [0.2023, 0.1994, 0.2010]
+    cifar_std = [0.2470, 0.2435, 0.2616]
 
     train_transform = transforms.Compose(
         [
@@ -43,14 +42,14 @@ def get_cifar100(
         ]
     )
 
-    trainset = torchvision.datasets.CIFAR100(
+    trainset = torchvision.datasets.CIFAR10(
         dir, download=True, train=True, transform=train_transform
     )
-    testset = torchvision.datasets.CIFAR100(
+    testset = torchvision.datasets.CIFAR10(
         dir, download=True, train=False, transform=test_transform
     )
 
-    # Class-balanced IID partition (matching original DIMAT DataPartition)
+    # Class-balanced IID partition
     labels = np.array(trainset.targets)
     classes = np.unique(labels)
     worker_indices = [[] for _ in range(num_clients)]

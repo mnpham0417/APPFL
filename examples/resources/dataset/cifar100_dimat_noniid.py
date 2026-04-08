@@ -1,7 +1,6 @@
 """
-CIFAR-100 dataset for DIMAT experiments.
-Uses lazy transforms (applied on each __getitem__ call) and class-balanced
-IID partitioning matching the original DIMAT codebase.
+CIFAR-100 dataset for DIMAT experiments with non-IID (class-based) partitioning.
+Uses lazy transforms (applied on each __getitem__ call) matching the IID variant.
 """
 
 import numpy as np
@@ -13,12 +12,13 @@ from torch.utils.data import Subset
 def get_cifar100(
     num_clients: int,
     client_id: int,
+    num_classes_per_client: int = 20,
     **kwargs,
 ):
     """
     Return the CIFAR-100 dataset for a given client with paper-matching
-    normalization. IID partition distributes each class equally across clients,
-    matching the original DIMAT DataPartition logic.
+    normalization. Non-IID partition assigns each client a disjoint subset
+    of classes.
     """
     import os
 
@@ -50,18 +50,24 @@ def get_cifar100(
         dir, download=True, train=False, transform=test_transform
     )
 
-    # Class-balanced IID partition (matching original DIMAT DataPartition)
+    # Non-IID partition: each client gets num_classes_per_client classes
     labels = np.array(trainset.targets)
     classes = np.unique(labels)
-    worker_indices = [[] for _ in range(num_clients)]
-    for cls in classes:
-        cls_indices = np.where(labels == cls)[0].tolist()
-        samples_per_client = len(cls_indices) // num_clients
-        for rank in range(num_clients):
-            start = rank * samples_per_client
-            end = start + samples_per_client
-            worker_indices[rank].extend(cls_indices[start:end])
+    np.random.seed(42)
+    np.random.shuffle(classes)
 
-    train_subset = Subset(trainset, worker_indices[client_id])
+    # Assign classes to clients round-robin
+    client_classes = [[] for _ in range(num_clients)]
+    for i, cls in enumerate(classes):
+        client_classes[i % num_clients].append(cls)
+
+    # Gather indices for this client's classes
+    my_classes = client_classes[client_id]
+    worker_indices = []
+    for cls in my_classes:
+        cls_indices = np.where(labels == cls)[0].tolist()
+        worker_indices.extend(cls_indices)
+
+    train_subset = Subset(trainset, worker_indices)
 
     return train_subset, testset
