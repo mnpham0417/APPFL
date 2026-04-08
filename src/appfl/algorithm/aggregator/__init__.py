@@ -21,7 +21,7 @@ except:  # noqa: E722
     pass
 
 try:
-    from .dlora_ab_svd_aggregator import DLoRABSVDAggregator
+    from .federated_lora_svd_aggregator import FederatedLoRASVDAggregator
 except:  # noqa: E722
     pass
 
@@ -49,7 +49,7 @@ __all__ = [
     "ICEADMMAggregator",
     "FedSBAggregator",
     "DIMATaggregator",
-    "DLoRABSVDAggregator",
+    "FederatedLoRASVDAggregator",
     "DecentralizedAggregator",
     "DecentralizedDLoRABSVDAggregator",
 ]

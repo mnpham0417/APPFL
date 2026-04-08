@@ -49,20 +49,18 @@ server_configs:
   scheduler: "SyncScheduler"
   scheduler_kwargs:
     same_init_model: True
-  # Decentralized dLoRA AB_SVD aggregator: topology-aware SVD-based LoRA consensus
-  aggregator: "DecentralizedDLoRABSVDAggregator"
+  # Federated LoRA SVD aggregator: SVD-based LoRA aggregation (single global model)
+  aggregator: "FederatedLoRASVDAggregator"
   aggregator_kwargs:
-    # Ring topology: each agent aggregates with its 2 ring neighbors (weight 1/3)
-    topology: "ring"
     # SVD truncation rank — must match the LoRA rank r used by all clients
     lora_rank: 2
-    # Weighting: "equal" — ring uses equal weights across neighborhood
-    client_weights_mode: "equal"
+    # Weighting: "sample_size" uses per-client dataset sizes (recommended)
+    client_weights_mode: "sample_size"
     # Device for SVD computation (cpu avoids GPU OOM when clients share the same GPU)
     device: "cpu"
-  num_global_epochs: 500       # total FL communication rounds
+  num_global_epochs: 2     # total FL communication rounds
   logging_output_dirname: "./output"
-  logging_output_filename: "result_decaf_ring"
+  logging_output_filename: "result_decaf_fedavg"
   comm_configs:
     grpc_configs:
       server_uri: localhost:50051
