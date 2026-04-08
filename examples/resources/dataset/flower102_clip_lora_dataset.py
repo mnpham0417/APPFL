@@ -112,7 +112,7 @@ def get_flower102_clip_lora(
     _add_clip_lora_to_path(clip_lora_root)
 
     import clip
-    from datasets import build_dataset
+    from clip_benchmarks import build_dataset
     import torchvision.transforms as transforms
 
     # CLIP training augmentation
