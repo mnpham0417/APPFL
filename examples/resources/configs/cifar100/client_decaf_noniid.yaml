@@ -10,7 +10,7 @@ data_configs:
   dataset_kwargs:
     dataset_name: "cifar100"
     root_path: "./datasets"      # torchvision downloads here automatically
-    shots: 20                    # few-shot per class (0 = full dataset)
+    shots: 50                    # few-shot per class (0 = full dataset)
     backbone: "ViT-B/16"         # must match server model_kwargs.backbone
     data_dist: "non-iid"
     num_clients: 5               # overridden by MPI script

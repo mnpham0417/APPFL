@@ -2,7 +2,7 @@ client_configs:
   train_configs:
     trainer: "DeCaFTrainer"
     mode: "step"
-    num_local_steps: 25
+    num_local_steps: 32         # 1 epoch: ceil(1000 imgs / batch 32) — shots=50, 5 clients, 100 classes
     encoder: "both"             # "vision" | "text" | "both"
     freeze_a: False
     lr: 2.0e-4
@@ -46,7 +46,7 @@ server_configs:
     lora_rank: 2                       # must match model_kwargs.r
     client_weights_mode: "sample_size"
     device: "cpu"
-  num_global_epochs: 5
+  num_global_epochs: 500
   logging_output_dirname: "./output"
   logging_output_filename: "result_decaf_cifar100"
   comm_configs:
