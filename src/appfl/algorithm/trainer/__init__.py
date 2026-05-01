@@ -39,10 +39,7 @@ __all__ = [
     "FedSBTrainer",
     "LLMDummyTrainer",
     "DIMATTrainer",
-<<<<<<< HEAD
     "DeCaFTrainer",
     "DecentralizedTrainer",
-=======
     "SklearnTrainer",
->>>>>>> 26d14fc27c7305f3646bb0557a2e4e4c524b4440
 ]
