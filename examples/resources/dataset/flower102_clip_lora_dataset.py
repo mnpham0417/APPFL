@@ -38,9 +38,8 @@ import os
 import sys
 import random
 from collections import defaultdict
-from typing import List, Optional
+from typing import Optional
 
-import torch
 from torch.utils.data import Dataset
 from PIL import Image
 
@@ -48,6 +47,7 @@ from PIL import Image
 # ---------------------------------------------------------------------------
 # Internal dataset wrapper
 # ---------------------------------------------------------------------------
+
 
 class _CLIPDatasetWrapper(Dataset):
     """
@@ -79,6 +79,7 @@ class _CLIPDatasetWrapper(Dataset):
 # ---------------------------------------------------------------------------
 # Public factory function
 # ---------------------------------------------------------------------------
+
 
 def get_flower102_clip_lora(
     data_path: str,
@@ -160,6 +161,7 @@ def get_flower102_clip_lora(
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _add_clip_lora_to_path(clip_lora_root: Optional[str]):
     """Insert clip_lora into sys.path so its packages are importable."""
     if clip_lora_root is not None:
@@ -218,6 +220,4 @@ def _partition(
         return client_data
 
     else:
-        raise ValueError(
-            f"data_dist must be 'iid' or 'non-iid', got '{data_dist}'"
-        )
+        raise ValueError(f"data_dist must be 'iid' or 'non-iid', got '{data_dist}'")

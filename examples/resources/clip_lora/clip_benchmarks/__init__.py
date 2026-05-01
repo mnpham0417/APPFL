@@ -12,22 +12,22 @@ from .imagenet import ImageNet
 
 
 dataset_list = {
-                "oxford_pets": OxfordPets,
-                "eurosat": EuroSAT,
-                "ucf101": UCF101,
-                "sun397": SUN397,
-                "caltech101": Caltech101,
-                "dtd": DescribableTextures,
-                "fgvc": FGVCAircraft,
-                "food101": Food101,
-                "oxford_flowers": OxfordFlowers,
-                "stanford_cars": StanfordCars,
-                "imagenet": ImageNet,
-                }
+    "oxford_pets": OxfordPets,
+    "eurosat": EuroSAT,
+    "ucf101": UCF101,
+    "sun397": SUN397,
+    "caltech101": Caltech101,
+    "dtd": DescribableTextures,
+    "fgvc": FGVCAircraft,
+    "food101": Food101,
+    "oxford_flowers": OxfordFlowers,
+    "stanford_cars": StanfordCars,
+    "imagenet": ImageNet,
+}
 
 
 def build_dataset(dataset, root_path, shots, preprocess):
-    if dataset == 'imagenet':
+    if dataset == "imagenet":
         return dataset_list[dataset](root_path, shots, preprocess)
     else:
         return dataset_list[dataset](root_path, shots)

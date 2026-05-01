@@ -14,7 +14,7 @@ from PIL import Image
 
 def read_json(fpath):
     """Read json file from a path."""
-    with open(fpath, 'r') as f:
+    with open(fpath) as f:
         obj = json.load(f)
     return obj
 
@@ -23,8 +23,8 @@ def write_json(obj, fpath):
     """Writes to a json file."""
     if not osp.exists(osp.dirname(fpath)):
         os.makedirs(osp.dirname(fpath))
-    with open(fpath, 'w') as f:
-        json.dump(obj, f, indent=4, separators=(',', ': '))
+    with open(fpath, "w") as f:
+        json.dump(obj, f, indent=4, separators=(",", ": "))
 
 
 def read_image(path):
@@ -37,16 +37,16 @@ def read_image(path):
         PIL image
     """
     if not osp.exists(path):
-        raise IOError('No file exists at {}'.format(path))
+        raise OSError(f"No file exists at {path}")
 
     while True:
         try:
-            img = Image.open(path).convert('RGB')
+            img = Image.open(path).convert("RGB")
             return img
-        except IOError:
+        except OSError:
             print(
-                'Cannot read image from {}, '
-                'probably due to heavy IO. Will re-try'.format(path)
+                "Cannot read image from {}, "
+                "probably due to heavy IO. Will re-try".format(path)
             )
 
 
@@ -57,7 +57,7 @@ def listdir_nohidden(path, sort=False):
          path (str): directory path.
          sort (bool): sort the items.
     """
-    items = [f for f in os.listdir(path) if not f.startswith('.') and 'sh' not in f]
+    items = [f for f in os.listdir(path) if not f.startswith(".") and "sh" not in f]
     if sort:
         items.sort()
     return items
@@ -73,7 +73,7 @@ class Datum:
         classname (str): class name.
     """
 
-    def __init__(self, impath='', label=0, domain=-1, classname=''):
+    def __init__(self, impath="", label=0, domain=-1, classname=""):
         assert isinstance(impath, str)
         assert isinstance(label, int)
         assert isinstance(domain, int)
@@ -107,14 +107,15 @@ class DatasetBase:
     2) domain generalization
     3) semi-supervised learning
     """
-    dataset_dir = '' # the directory where the dataset is stored
-    domains = [] # string names of all domains
+
+    dataset_dir = ""  # the directory where the dataset is stored
+    domains = []  # string names of all domains
 
     def __init__(self, train_x=None, train_u=None, val=None, test=None):
-        self._train_x = train_x # labeled training data
-        self._train_u = train_u # unlabeled training data (optional)
-        self._val = val # validation data (optional)
-        self._test = test # test data
+        self._train_x = train_x  # labeled training data
+        self._train_u = train_u  # unlabeled training data (optional)
+        self._val = val  # validation data (optional)
+        self._test = test  # test data
 
         self._num_classes = self.get_num_classes(train_x)
         self._lab2cname, self._classnames = self.get_lab2cname(train_x)
@@ -181,8 +182,9 @@ class DatasetBase:
         for domain in input_domains:
             if domain not in self.domains:
                 raise ValueError(
-                    'Input domain must belong to {}, '
-                    'but got [{}]'.format(self.domains, domain)
+                    "Input domain must belong to {}, but got [{}]".format(
+                        self.domains, domain
+                    )
                 )
 
     def download_data(self, url, dst, from_gdrive=True):
@@ -194,22 +196,20 @@ class DatasetBase:
         else:
             raise NotImplementedError
 
-        print('Extracting file ...')
+        print("Extracting file ...")
 
         try:
             tar = tarfile.open(dst)
             tar.extractall(path=osp.dirname(dst))
             tar.close()
         except:
-            zip_ref = zipfile.ZipFile(dst, 'r')
+            zip_ref = zipfile.ZipFile(dst, "r")
             zip_ref.extractall(osp.dirname(dst))
             zip_ref.close()
 
-        print('File extracted to {}'.format(osp.dirname(dst)))
+        print(f"File extracted to {osp.dirname(dst)}")
 
-    def generate_fewshot_dataset(
-        self, *data_sources, num_shots=-1, repeat=True
-    ):
+    def generate_fewshot_dataset(self, *data_sources, num_shots=-1, repeat=True):
         """Generate a few-shot dataset (typically for the training set).
 
         This function is useful when one wants to evaluate a model
@@ -226,7 +226,7 @@ class DatasetBase:
                 return data_sources[0]
             return data_sources
 
-        print(f'Creating a {num_shots}-shot dataset')
+        print(f"Creating a {num_shots}-shot dataset")
 
         output = []
 
@@ -281,10 +281,17 @@ class DatasetBase:
 
 
 class DatasetWrapper(TorchDataset):
-    def __init__(self, data_source, input_size, transform=None, is_train=False,
-                 return_img0=False, k_tfm=1):
+    def __init__(
+        self,
+        data_source,
+        input_size,
+        transform=None,
+        is_train=False,
+        return_img0=False,
+        k_tfm=1,
+    ):
         self.data_source = data_source
-        self.transform = transform # accept list (tuple) as input
+        self.transform = transform  # accept list (tuple) as input
         self.is_train = is_train
         # Augmenting an image K>1 times is only allowed during training
         self.k_tfm = k_tfm if is_train else 1
@@ -292,8 +299,9 @@ class DatasetWrapper(TorchDataset):
 
         if self.k_tfm > 1 and transform is None:
             raise ValueError(
-                'Cannot augment the image {} times '
-                'because transform is None'.format(self.k_tfm)
+                "Cannot augment the image {} times because transform is None".format(
+                    self.k_tfm
+                )
             )
 
         # Build transform that doesn't apply any data augmentation
@@ -302,7 +310,8 @@ class DatasetWrapper(TorchDataset):
         to_tensor += [T.Resize(input_size, interpolation=interp_mode)]
         to_tensor += [T.ToTensor()]
         normalize = T.Normalize(
-            mean=(0.48145466, 0.4578275, 0.40821073), std=(0.26862954, 0.26130258, 0.27577711)
+            mean=(0.48145466, 0.4578275, 0.40821073),
+            std=(0.26862954, 0.26130258, 0.27577711),
         )
         to_tensor += [normalize]
         self.to_tensor = T.Compose(to_tensor)
@@ -313,11 +322,7 @@ class DatasetWrapper(TorchDataset):
     def __getitem__(self, idx):
         item = self.data_source[idx]
 
-        output = {
-            'label': item.label,
-            'domain': item.domain,
-            'impath': item.impath
-        }
+        output = {"label": item.label, "domain": item.domain, "impath": item.impath}
 
         img0 = read_image(item.impath)
 
@@ -325,18 +330,18 @@ class DatasetWrapper(TorchDataset):
             if isinstance(self.transform, (list, tuple)):
                 for i, tfm in enumerate(self.transform):
                     img = self._transform_image(tfm, img0)
-                    keyname = 'img'
+                    keyname = "img"
                     if (i + 1) > 1:
                         keyname += str(i + 1)
                     output[keyname] = img
             else:
                 img = self._transform_image(self.transform, img0)
-                output['img'] = img
+                output["img"] = img
 
         if self.return_img0:
-            output['img0'] = self.to_tensor(img0)
+            output["img0"] = self.to_tensor(img0)
 
-        return output['img'], output['label']
+        return output["img"], output["label"]
 
     def _transform_image(self, tfm, img0):
         img_list = []
@@ -359,21 +364,22 @@ def build_data_loader(
     is_train=True,
     shuffle=False,
     dataset_wrapper=None,
-    num_workers=8
+    num_workers=8,
 ):
 
     if dataset_wrapper is None:
         dataset_wrapper = DatasetWrapper
 
-    
     # Build data loader
     data_loader = torch.utils.data.DataLoader(
-        dataset_wrapper(data_source, input_size=input_size, transform=tfm, is_train=is_train),
+        dataset_wrapper(
+            data_source, input_size=input_size, transform=tfm, is_train=is_train
+        ),
         batch_size=batch_size,
         num_workers=num_workers,
         shuffle=shuffle,
         drop_last=False,
-        pin_memory=(torch.cuda.is_available())
+        pin_memory=(torch.cuda.is_available()),
     )
     assert len(data_loader) > 0
 

@@ -66,17 +66,17 @@ args = parser.parse_args()
 
 _config_stem = os.path.splitext(os.path.basename(args.server_config))[0]
 if _config_stem.startswith("server_"):
-    _config_stem = _config_stem[len("server_"):]
+    _config_stem = _config_stem[len("server_") :]
 
 _cfg = OmegaConf.load(args.server_config)
-_tc  = _cfg.get("client_configs", {}).get("train_configs", {})
-_mk  = _cfg.get("client_configs", {}).get("model_configs", {}).get("model_kwargs", {})
-_sc  = _cfg.get("server_configs", {})
+_tc = _cfg.get("client_configs", {}).get("train_configs", {})
+_mk = _cfg.get("client_configs", {}).get("model_configs", {}).get("model_kwargs", {})
+_sc = _cfg.get("server_configs", {})
 
-_rounds  = _sc.get("num_global_epochs", "?")
-_ls      = _tc.get("num_local_steps", "?")
-_lora_r  = _mk.get("r", "?")
-_lr_raw  = _tc.get("lr", "?")
+_rounds = _sc.get("num_global_epochs", "?")
+_ls = _tc.get("num_local_steps", "?")
+_lora_r = _mk.get("r", "?")
+_lr_raw = _tc.get("lr", "?")
 
 
 def _fmt_lr(v):

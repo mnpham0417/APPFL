@@ -72,8 +72,8 @@ class DeCaFTrainer(VanillaTrainer):
             logger=logger,
             **kwargs,
         )
-        self._lora_marked = False          # whether LoRA-only freeze has been applied
-        self._text_features_cache = None   # cached text features (vision-only training)
+        self._lora_marked = False  # whether LoRA-only freeze has been applied
+        self._text_features_cache = None  # cached text features (vision-only training)
         self._scaler = torch.amp.GradScaler()
 
         # Re-create the train DataLoader with a seeded generator so that
@@ -84,6 +84,7 @@ class DeCaFTrainer(VanillaTrainer):
             _g = torch.Generator()
             _g.manual_seed(torch.initial_seed())
             from torch.utils.data import DataLoader
+
             self.train_dataloader = DataLoader(
                 self.train_dataset,
                 batch_size=self.train_configs.get("train_batch_size", 32),
@@ -143,14 +144,10 @@ class DeCaFTrainer(VanillaTrainer):
         self.model.train()
 
         # Precompute text features (cache when text encoder is frozen)
-        text_features = self._get_text_features(
-            classnames, template, encoder, device
-        )
+        text_features = self._get_text_features(classnames, template, encoder, device)
 
         # Optimizer and scheduler (re-created each round, matching VanillaTrainer)
-        lora_params = [
-            p for p in self.model.parameters() if p.requires_grad
-        ]
+        lora_params = [p for p in self.model.parameters() if p.requires_grad]
         optimizer = torch.optim.AdamW(
             lora_params,
             lr=lr,
@@ -189,9 +186,7 @@ class DeCaFTrainer(VanillaTrainer):
                     with torch.amp.autocast("cuda", dtype=torch.float16):
                         image_features = self.model.encode_image(images)
 
-            image_features = image_features / image_features.norm(
-                dim=-1, keepdim=True
-            )
+            image_features = image_features / image_features.norm(dim=-1, keepdim=True)
 
             cosine_sim = logit_scale * image_features @ text_features.t()
             loss = F.cross_entropy(cosine_sim.float(), targets)
@@ -218,7 +213,10 @@ class DeCaFTrainer(VanillaTrainer):
 
         # Optional per-round validation
         acc = None
-        if self.train_configs.get("do_validation", False) and self.val_dataset is not None:
+        if (
+            self.train_configs.get("do_validation", False)
+            and self.val_dataset is not None
+        ):
             acc = self._validate(classnames, template, device, logit_scale)
             if self.logger:
                 self.logger.info(
@@ -323,9 +321,7 @@ class DeCaFTrainer(VanillaTrainer):
             else:
                 param.requires_grad = True
 
-        trainable = sum(
-            p.numel() for p in self.model.parameters() if p.requires_grad
-        )
+        trainable = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         if self.logger:
             self.logger.info(
                 f"[DeCaFTrainer] Frozen non-LoRA params. "
@@ -357,7 +353,5 @@ class DeCaFTrainer(VanillaTrainer):
             with torch.amp.autocast("cuda", dtype=torch.float16):
                 tokens = clip_pkg.tokenize(texts).to(device)
                 class_embeddings = self.model.encode_text(tokens)
-        text_features = class_embeddings / class_embeddings.norm(
-            dim=-1, keepdim=True
-        )
+        text_features = class_embeddings / class_embeddings.norm(dim=-1, keepdim=True)
         return text_features

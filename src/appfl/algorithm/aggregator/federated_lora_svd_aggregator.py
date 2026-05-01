@@ -52,7 +52,9 @@ class FederatedLoRASVDAggregator(BaseAggregator):
         self.aggregator_configs = aggregator_configs
 
         self.lora_rank = aggregator_configs.get("lora_rank", 2)
-        self.client_weights_mode = aggregator_configs.get("client_weights_mode", "equal")
+        self.client_weights_mode = aggregator_configs.get(
+            "client_weights_mode", "equal"
+        )
         self.device = aggregator_configs.get("device", "cpu")
 
         self.sample_sizes: Dict[str, int] = {}
@@ -131,7 +133,11 @@ class FederatedLoRASVDAggregator(BaseAggregator):
                     A = local_models[cid][key_A]
                     B = local_models[cid][key_B]
                     scaled = (B @ A) * weights[cid]  # (out_dim, in_dim)
-                    summed_product = scaled.clone() if summed_product is None else summed_product + scaled
+                    summed_product = (
+                        scaled.clone()
+                        if summed_product is None
+                        else summed_product + scaled
+                    )
 
                 summed_product = summed_product.to(self.device)
 
@@ -140,8 +146,10 @@ class FederatedLoRASVDAggregator(BaseAggregator):
                 U_r, S_r, Vh_r = U[:, :r], S[:r], Vh[:r, :]
                 sqrt_S_r = torch.sqrt(S_r)
 
-                global_dict[key_B] = (U_r * sqrt_S_r.unsqueeze(0)).cpu()    # (in_dim, r)
-                global_dict[key_A] = (sqrt_S_r.unsqueeze(1) * Vh_r).cpu()   # (r, out_dim)
+                global_dict[key_B] = (U_r * sqrt_S_r.unsqueeze(0)).cpu()  # (in_dim, r)
+                global_dict[key_A] = (
+                    sqrt_S_r.unsqueeze(1) * Vh_r
+                ).cpu()  # (r, out_dim)
                 written_lora_b_keys.add(key_B)
 
             else:
@@ -157,11 +165,14 @@ class FederatedLoRASVDAggregator(BaseAggregator):
 
         # Safety pass: handle any w_lora_B keys not yet written
         for key in first_state.keys():
-            if "w_lora_B" in key and key not in written_lora_b_keys and key not in global_dict:
+            if (
+                "w_lora_B" in key
+                and key not in written_lora_b_keys
+                and key not in global_dict
+            ):
                 param = first_state[key]
                 aggregated = sum(
-                    local_models[cid][key].float() * weights[cid]
-                    for cid in client_ids
+                    local_models[cid][key].float() * weights[cid] for cid in client_ids
                 )
                 global_dict[key] = aggregated.to(param.dtype).cpu()
 

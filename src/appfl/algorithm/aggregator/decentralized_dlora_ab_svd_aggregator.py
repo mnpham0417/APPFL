@@ -32,7 +32,7 @@ References:
 """
 
 import copy
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 import torch
 from omegaconf import DictConfig
@@ -98,9 +98,7 @@ class DecentralizedDLoRABSVDAggregator(BaseAggregator):
             "DecentralizedDLoRABSVDAggregator has no model or global state."
         )
 
-    def aggregate(
-        self, local_models: Dict, **kwargs
-    ) -> Dict[str, Dict]:
+    def aggregate(self, local_models: Dict, **kwargs) -> Dict[str, Dict]:
         """
         Aggregate local LoRA models using topology-aware AB_SVD consensus.
 
@@ -168,9 +166,7 @@ class DecentralizedDLoRABSVDAggregator(BaseAggregator):
                 neighborhood[nbr_cid] = local_models[nbr_cid]
                 nbr_weights[nbr_cid] = w
 
-            per_client_states[cid] = self._ab_svd_aggregate(
-                neighborhood, nbr_weights
-            )
+            per_client_states[cid] = self._ab_svd_aggregate(neighborhood, nbr_weights)
 
             if self.logger:
                 nbr_names = [client_ids[j] for j in neighbor_weights_idx]
@@ -233,13 +229,11 @@ class DecentralizedDLoRABSVDAggregator(BaseAggregator):
 
                 # Truncated SVD on the transposed product
                 # summed_product.t() shape: (in_dim, out_dim)
-                U, S, Vh = torch.linalg.svd(
-                    summed_product.t(), full_matrices=False
-                )
+                U, S, Vh = torch.linalg.svd(summed_product.t(), full_matrices=False)
                 r = self.lora_rank
-                U_r = U[:, :r]      # (in_dim, r)
-                S_r = S[:r]         # (r,)
-                Vh_r = Vh[:r, :]    # (r, out_dim)
+                U_r = U[:, :r]  # (in_dim, r)
+                S_r = S[:r]  # (r,)
+                Vh_r = Vh[:r, :]  # (r, out_dim)
                 sqrt_S_r = torch.sqrt(S_r)
 
                 # Symmetric split — shapes match original A and B
@@ -247,8 +241,8 @@ class DecentralizedDLoRABSVDAggregator(BaseAggregator):
                 #   Following the same convention as DLoRABSVDAggregator:
                 #   new_B = U_r * sqrt_S_r  (in_dim, r) — broadcast col-wise
                 #   new_A = sqrt_S_r[:,None] * Vh_r     (r, out_dim)
-                new_B = U_r * sqrt_S_r.unsqueeze(0)         # (in_dim, r)
-                new_A = sqrt_S_r.unsqueeze(1) * Vh_r        # (r, out_dim)
+                new_B = U_r * sqrt_S_r.unsqueeze(0)  # (in_dim, r)
+                new_A = sqrt_S_r.unsqueeze(1) * Vh_r  # (r, out_dim)
 
                 global_dict[key_B] = new_B.cpu()
                 global_dict[key_A] = new_A.cpu()
@@ -276,8 +270,7 @@ class DecentralizedDLoRABSVDAggregator(BaseAggregator):
             ):
                 param = first_state[key]
                 aggregated = sum(
-                    local_models[cid][key].float() * weights[cid]
-                    for cid in client_ids
+                    local_models[cid][key].float() * weights[cid] for cid in client_ids
                 )
                 global_dict[key] = aggregated.to(param.dtype).cpu()
 
@@ -289,17 +282,9 @@ class DecentralizedDLoRABSVDAggregator(BaseAggregator):
 
     def _fc_weights(self, client_ids: List[str]) -> Dict[str, float]:
         """Compute per-client mixing weights for FC topology."""
-        if (
-            self.client_weights_mode == "sample_size"
-            and self.sample_sizes
-        ):
-            total = sum(
-                self.sample_sizes.get(cid, 1) for cid in client_ids
-            )
-            return {
-                cid: self.sample_sizes.get(cid, 1) / total
-                for cid in client_ids
-            }
+        if self.client_weights_mode == "sample_size" and self.sample_sizes:
+            total = sum(self.sample_sizes.get(cid, 1) for cid in client_ids)
+            return {cid: self.sample_sizes.get(cid, 1) / total for cid in client_ids}
         w = 1.0 / len(client_ids)
         return {cid: w for cid in client_ids}
 

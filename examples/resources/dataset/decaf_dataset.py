@@ -54,8 +54,17 @@ from torch.utils.data import Dataset
 
 # Datasets served by clip_benchmarks (resources/clip_lora/clip_benchmarks/)
 _CLIP_BENCHMARK_DATASETS = {
-    "oxford_flowers", "oxford_pets", "caltech101", "dtd", "eurosat",
-    "fgvc", "food101", "stanford_cars", "sun397", "ucf101", "imagenet",
+    "oxford_flowers",
+    "oxford_pets",
+    "caltech101",
+    "dtd",
+    "eurosat",
+    "fgvc",
+    "food101",
+    "stanford_cars",
+    "sun397",
+    "ucf101",
+    "imagenet",
 }
 
 # Torchvision-backed datasets.
@@ -64,27 +73,43 @@ _TORCHVISION_REGISTRY = {
     "cifar10": {
         "loader": torchvision.datasets.CIFAR10,
         "classnames": [
-            "airplane", "automobile", "bird", "cat", "deer",
-            "dog", "frog", "horse", "ship", "truck",
+            "airplane",
+            "automobile",
+            "bird",
+            "cat",
+            "deer",
+            "dog",
+            "frog",
+            "horse",
+            "ship",
+            "truck",
         ],
         "template": ["a photo of a {}."],
         "split_kwargs": lambda train: {"train": train},
     },
     "cifar100": {
         "loader": torchvision.datasets.CIFAR100,
-        "classnames": None,   # pulled from dataset.classes
+        "classnames": None,  # pulled from dataset.classes
         "template": ["a photo of a {}."],
         "split_kwargs": lambda train: {"train": train},
     },
     "mnist": {
         "loader": torchvision.datasets.MNIST,
         "classnames": [
-            "zero", "one", "two", "three", "four",
-            "five", "six", "seven", "eight", "nine",
+            "zero",
+            "one",
+            "two",
+            "three",
+            "four",
+            "five",
+            "six",
+            "seven",
+            "eight",
+            "nine",
         ],
         "template": ["a handwritten digit {}."],
         "split_kwargs": lambda train: {"train": train},
-        "grayscale": True,   # needs L→RGB conversion
+        "grayscale": True,  # needs L→RGB conversion
     },
     "stl10": {
         "loader": torchvision.datasets.STL10,
@@ -98,6 +123,7 @@ _TORCHVISION_REGISTRY = {
 # ---------------------------------------------------------------------------
 # Dataset wrappers
 # ---------------------------------------------------------------------------
+
 
 class _CLIPBenchmarkWrapper(Dataset):
     """
@@ -150,6 +176,7 @@ class _TorchvisionWrapper(Dataset):
 # Public entry point
 # ---------------------------------------------------------------------------
 
+
 def get_decaf_dataset(
     dataset_name: str,
     root_path: str,
@@ -186,13 +213,25 @@ def get_decaf_dataset(
 
     if dataset_name in _CLIP_BENCHMARK_DATASETS:
         return _load_clip_benchmark(
-            dataset_name, root_path, shots, clip_preprocess,
-            num_clients, client_id, data_dist, seed,
+            dataset_name,
+            root_path,
+            shots,
+            clip_preprocess,
+            num_clients,
+            client_id,
+            data_dist,
+            seed,
         )
     elif dataset_name in _TORCHVISION_REGISTRY:
         return _load_torchvision(
-            dataset_name, root_path, shots, clip_preprocess,
-            num_clients, client_id, data_dist, seed,
+            dataset_name,
+            root_path,
+            shots,
+            clip_preprocess,
+            num_clients,
+            client_id,
+            data_dist,
+            seed,
         )
     else:
         supported = sorted(_CLIP_BENCHMARK_DATASETS | set(_TORCHVISION_REGISTRY))
@@ -205,9 +244,16 @@ def get_decaf_dataset(
 # Backend: CLIP benchmark datasets
 # ---------------------------------------------------------------------------
 
+
 def _load_clip_benchmark(
-    dataset_name, root_path, shots, clip_preprocess,
-    num_clients, client_id, data_dist, seed,
+    dataset_name,
+    root_path,
+    shots,
+    clip_preprocess,
+    num_clients,
+    client_id,
+    data_dist,
+    seed,
 ):
     from clip_benchmarks import build_dataset
 
@@ -220,8 +266,12 @@ def _load_clip_benchmark(
 
     client_data = _partition_datums(train_x, num_clients, client_id, data_dist, seed)
 
-    train_dataset = _CLIPBenchmarkWrapper(client_data, train_transform, classnames, template)
-    val_dataset = _CLIPBenchmarkWrapper(full_dataset.val, clip_preprocess, classnames, template)
+    train_dataset = _CLIPBenchmarkWrapper(
+        client_data, train_transform, classnames, template
+    )
+    val_dataset = _CLIPBenchmarkWrapper(
+        full_dataset.val, clip_preprocess, classnames, template
+    )
     return train_dataset, val_dataset
 
 
@@ -229,9 +279,16 @@ def _load_clip_benchmark(
 # Backend: Torchvision datasets
 # ---------------------------------------------------------------------------
 
+
 def _load_torchvision(
-    dataset_name, root_path, shots, clip_preprocess,
-    num_clients, client_id, data_dist, seed,
+    dataset_name,
+    root_path,
+    shots,
+    clip_preprocess,
+    num_clients,
+    client_id,
+    data_dist,
+    seed,
 ):
     cfg = _TORCHVISION_REGISTRY[dataset_name]
     loader_cls = cfg["loader"]
@@ -246,8 +303,12 @@ def _load_torchvision(
         val_transform = T.Compose([_to_rgb, clip_preprocess])
 
     # Load base datasets without transform
-    train_base = loader_cls(root_path, download=True, transform=None, **split_kwargs(True))
-    val_base = loader_cls(root_path, download=True, transform=None, **split_kwargs(False))
+    train_base = loader_cls(
+        root_path, download=True, transform=None, **split_kwargs(True)
+    )
+    val_base = loader_cls(
+        root_path, download=True, transform=None, **split_kwargs(False)
+    )
 
     # Resolve classnames
     classnames = cfg["classnames"]
@@ -275,6 +336,7 @@ def _load_torchvision(
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
+
 
 def _clip_train_transform(grayscale: bool = False):
     """Standard CLIP training augmentation."""

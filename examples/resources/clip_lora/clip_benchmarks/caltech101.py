@@ -1,20 +1,19 @@
 import os
 
-from .utils import Datum, DatasetBase
+from .utils import DatasetBase
 from .oxford_pets import OxfordPets
 
 
-template = ['a photo of a {}.']
+template = ["a photo of a {}."]
 
 
 class Caltech101(DatasetBase):
-
-    dataset_dir = 'Caltech101'
+    dataset_dir = "Caltech101"
 
     def __init__(self, root, num_shots):
         self.dataset_dir = os.path.join(root, self.dataset_dir)
-        self.image_dir = os.path.join(self.dataset_dir, '101_ObjectCategories')
-        self.split_path = os.path.join(self.dataset_dir, 'split_zhou_Caltech101.json')
+        self.image_dir = os.path.join(self.dataset_dir, "101_ObjectCategories")
+        self.split_path = os.path.join(self.dataset_dir, "split_zhou_Caltech101.json")
 
         self.template = template
 

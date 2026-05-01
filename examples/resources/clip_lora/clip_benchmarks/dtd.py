@@ -7,16 +7,18 @@ from .oxford_pets import OxfordPets
 """
 template = ['{} texture.']
 """
-template = ['a photo of a {}.']
+template = ["a photo of a {}."]
+
 
 class DescribableTextures(DatasetBase):
-
-    dataset_dir = 'DTD'
+    dataset_dir = "DTD"
 
     def __init__(self, root, num_shots):
         self.dataset_dir = os.path.join(root, self.dataset_dir)
-        self.image_dir = os.path.join(self.dataset_dir, 'images')
-        self.split_path = os.path.join(self.dataset_dir, 'split_zhou_DescribableTextures.json')
+        self.image_dir = os.path.join(self.dataset_dir, "images")
+        self.split_path = os.path.join(
+            self.dataset_dir, "split_zhou_DescribableTextures.json"
+        )
 
         self.template = template
 
@@ -26,14 +28,10 @@ class DescribableTextures(DatasetBase):
         train = self.generate_fewshot_dataset(train, num_shots=num_shots)
 
         super().__init__(train_x=train, val=val, test=test)
-    
+
     @staticmethod
     def read_and_split_data(
-        image_dir,
-        p_trn=0.5,
-        p_val=0.2,
-        ignored=[],
-        new_cnames=None
+        image_dir, p_trn=0.5, p_val=0.2, ignored=[], new_cnames=None
     ):
         # The data are supposed to be organized into the following structure
         # =============
@@ -47,15 +45,17 @@ class DescribableTextures(DatasetBase):
         categories.sort()
 
         p_tst = 1 - p_trn - p_val
-        print(f'Splitting into {p_trn:.0%} train, {p_val:.0%} val, and {p_tst:.0%} test')
+        print(
+            f"Splitting into {p_trn:.0%} train, {p_val:.0%} val, and {p_tst:.0%} test"
+        )
 
         def _collate(ims, y, c):
             items = []
             for im in ims:
                 item = Datum(
                     impath=im,
-                    label=y, # is already 0-based
-                    classname=c
+                    label=y,  # is already 0-based
+                    classname=c,
                 )
                 items.append(item)
             return items
@@ -76,7 +76,7 @@ class DescribableTextures(DatasetBase):
                 category = new_cnames[category]
 
             train.extend(_collate(images[:n_train], label, category))
-            val.extend(_collate(images[n_train:n_train+n_val], label, category))
-            test.extend(_collate(images[n_train+n_val:], label, category))
-        
+            val.extend(_collate(images[n_train : n_train + n_val], label, category))
+            test.extend(_collate(images[n_train + n_val :], label, category))
+
         return train, val, test
