@@ -7,10 +7,62 @@ Similar to examples/globus_compute/run.py but for TES integration.
 
 import pprint
 import argparse
+from urllib.parse import urlparse
 from omegaconf import OmegaConf
 from concurrent.futures import Future
 from appfl.agent import ServerAgent
 from appfl.comm.tes import TESServerCommunicator
+
+import fedviz
+from fedviz.emitters import SSEEmitter
+from fedviz.geo import get_location, is_local, parse_ip
+
+
+class FedVizServerAgent(ServerAgent):
+    def __init__(self, *args, client_agent_configs=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._current_round = -1
+        self._client_locs = {}
+
+        # Build peer map from TES endpoint URLs in client configs
+        self._peer_by_client = {}
+        for cfg in client_agent_configs or []:
+            client_id = str(cfg.get("client_id", ""))
+            endpoint = (
+                cfg.get("comm_configs", {})
+                .get("tes_configs", {})
+                .get("tes_endpoint", "")
+            )
+            if client_id and endpoint:
+                host = urlparse(endpoint).hostname or ""
+                self._peer_by_client[client_id] = f"ipv4:{host}"
+
+    def global_update(self, client_id, local_model, *args, **kwargs):
+        round_num = kwargs.get("round", 0)
+
+        if round_num != self._current_round:
+            if self._current_round >= 0:
+                fedviz.log_round(round=self._current_round)
+            self._current_round = round_num
+            fedviz.round_start(round_num)
+
+        # Resolve geo once per client from the TES endpoint IP
+        raw_peer = self._peer_by_client.get(str(client_id), "")
+        parsed_ip = parse_ip(raw_peer)
+        geo = {}
+        if parsed_ip and not is_local(parsed_ip):
+            if str(client_id) not in self._client_locs:
+                self._client_locs[str(client_id)] = get_location(parsed_ip)
+            loc = self._client_locs.get(str(client_id)) or {}
+            geo = {
+                k: v for k, v in loc.items() if k in ("lat", "lng", "city", "country")
+            }
+
+        result = super().global_update(client_id, local_model, *args, **kwargs)
+        fedviz.log_client_update(client_id=client_id, **kwargs, **geo)
+
+        return result
+
 
 argparser = argparse.ArgumentParser()
 argparser.add_argument(
@@ -30,6 +82,15 @@ args = argparser.parse_args()
 server_agent_config = OmegaConf.load(args.server_config)
 client_agent_configs = OmegaConf.load(args.client_config)
 
+fedviz.init(
+    algorithm="Federated GWAS Meta-Analysis",
+    config=OmegaConf.to_container(server_agent_config.server_configs, resolve=True),
+    emitters=[
+        SSEEmitter(port=7070, serve_map=True),
+    ],
+)
+
+
 # Override auth token if provided
 if args.auth_token:
     if "comm_configs" not in server_agent_config:
@@ -39,7 +100,12 @@ if args.auth_token:
     server_agent_config.comm_configs.tes_configs.auth_token = args.auth_token
 
 # Create server agent
-server_agent = ServerAgent(server_agent_config=server_agent_config)
+server_agent = FedVizServerAgent(
+    server_agent_config=server_agent_config,
+    client_agent_configs=OmegaConf.to_container(
+        client_agent_configs["clients"], resolve=True
+    ),
+)
 
 # Create server communicator
 server_communicator = TESServerCommunicator(
@@ -131,3 +197,6 @@ while not server_agent.training_finished():
 
 server_communicator.cancel_all_tasks()
 server_communicator.shutdown_all_clients()
+
+fedviz.log_round(round=server_agent._current_round)
+fedviz.finish()
