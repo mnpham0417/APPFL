@@ -27,8 +27,8 @@ def get_b2ai_voice(client_id: int, dataset_path: str, **kwargs):
     # Load training data for this client (all recordings used for training)
     train_path = os.path.join(dataset_path, f"client_{client_id}", "data.npz")
     train_cache = np.load(train_path, allow_pickle=True)
-    X_train = train_cache["X"].astype(np.float32)   # (N, 402)
-    y_train = train_cache["y"].astype(np.int64)     # (N,)
+    X_train = train_cache["X"].astype(np.float32)  # (N, 402)
+    y_train = train_cache["y"].astype(np.int64)  # (N,)
 
     # Load shared validation set from multi-cohort / controls (client_4)
     val_path = os.path.join(dataset_path, "client_4", "data.npz")
@@ -38,9 +38,9 @@ def get_b2ai_voice(client_id: int, dataset_path: str, **kwargs):
 
     # Normalize using train statistics only
     mean = X_train.mean(axis=0)
-    std  = X_train.std(axis=0) + 1e-8
+    std = X_train.std(axis=0) + 1e-8
     X_train = (X_train - mean) / std
-    X_val   = (X_val   - mean) / std
+    X_val = (X_val - mean) / std
 
     train_dataset = Dataset(
         torch.FloatTensor(X_train),

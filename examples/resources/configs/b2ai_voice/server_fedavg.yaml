@@ -3,7 +3,7 @@ client_configs:
     # Local trainer
     trainer: "VanillaTrainer"
     mode: "step"
-    num_local_steps: 100
+    num_local_steps: 200
     optim: "Adam"
     optim_args:
       lr: 0.001
@@ -26,6 +26,7 @@ client_configs:
     train_batch_size: 16
     val_batch_size: 16
     train_data_shuffle: True
+    train_drop_last: True
     val_data_shuffle: False
 
   model_configs:
@@ -45,7 +46,7 @@ client_configs:
       param_cutoff: 1024
 
 server_configs:
-  num_clients: 2
+  num_clients: 4
   scheduler: "SyncScheduler"
   scheduler_kwargs:
     same_init_model: True
