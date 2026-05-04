@@ -5,7 +5,7 @@ train_configs:
   logging_output_dirname: "./output"
   logging_output_filename: "result"
 
-# Local dataset -- cohort: Voice Disorders
+# Local dataset -- cohort: Neurological
 # Validation is the shared multi-cohort / controls set (client_4/data.npz)
 data_configs:
   dataset_path: "./resources/dataset/b2ai_voice_dataset.py"

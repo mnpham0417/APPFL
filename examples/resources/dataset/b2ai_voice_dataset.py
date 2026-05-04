@@ -26,13 +26,13 @@ def get_b2ai_voice(client_id: int, dataset_path: str, **kwargs):
     """
     # Load training data for this client (all recordings used for training)
     train_path = os.path.join(dataset_path, f"client_{client_id}", "data.npz")
-    train_cache = np.load(train_path, allow_pickle=True)
+    train_cache = np.load(train_path)
     X_train = train_cache["X"].astype(np.float32)  # (N, 402)
     y_train = train_cache["y"].astype(np.int64)  # (N,)
 
     # Load shared validation set from multi-cohort / controls (client_4)
     val_path = os.path.join(dataset_path, "client_4", "data.npz")
-    val_cache = np.load(val_path, allow_pickle=True)
+    val_cache = np.load(val_path)
     X_val = val_cache["X"].astype(np.float32)
     y_val = val_cache["y"].astype(np.int64)
 

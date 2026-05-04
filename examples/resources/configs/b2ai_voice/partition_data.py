@@ -9,14 +9,13 @@ Client assignment (by participant_id):
   3 - Respiratory only            (eligible_studies___4, single-cohort)
   4 - Multi-cohort & controls     (eligible for 2+ cohorts)
 
-Output: data/partitioned_data/client_<N>/data.npz
+Output: datasets/RawData/b2ai-voice/partitioned_data/client_<N>/data.npz
   each file contains arrays: X (recordings x 402), y (labels), pids (participant_ids)
 """
 
 import os
 import numpy as np
 import pandas as pd
-from datasets import Dataset
 
 DATA_DIR = os.path.join(
     os.path.dirname(__file__), "..", "..", "..", "datasets", "RawData", "b2ai-voice"
@@ -85,7 +84,7 @@ for cid, name in client_names.items():
 # ---------------------------------------------------------------------------
 if os.path.exists(CACHE_FILE):
     print(f"\nLoading pooled features from cache: {CACHE_FILE}")
-    cache = np.load(CACHE_FILE, allow_pickle=True)
+    cache = np.load(CACHE_FILE)
     X = cache["X"]
     y = cache["y"]
     pids = cache["pids"]
@@ -93,13 +92,13 @@ else:
     print(
         "\nCache not found. Loading spectrograms from parquet (this may take a minute)..."
     )
-    ds = Dataset.from_parquet(os.path.join(DATA_DIR, "spectrogram.parquet"))
+    ds = pd.read_parquet(os.path.join(DATA_DIR, "spectrogram.parquet"))
     features, labels, participant_ids = [], [], []
-    for rec in ds:
-        pid = rec["participant_id"]
+    for rec in ds.itertuples(index=False):
+        pid = rec.participant_id
         if pid not in pid_to_label:
             continue
-        spec = np.asarray(rec["spectrogram"], dtype=np.float32)  # (201, N)
+        spec = np.asarray(rec.spectrogram, dtype=np.float32)  # (201, N)
         pooled = np.concatenate([spec.mean(axis=1), spec.std(axis=1)])  # (402,)
         features.append(pooled)
         labels.append(pid_to_label[pid])
