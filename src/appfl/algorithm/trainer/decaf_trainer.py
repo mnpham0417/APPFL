@@ -109,7 +109,6 @@ class DeCaFTrainer(VanillaTrainer):
 
         # Read training config
         encoder = self.train_configs.get("encoder", "both")
-        freeze_a = self.train_configs.get("freeze_a", False)
         # Use the model's learned logit_scale (clamped to CLIP's safe range)
         # rather than a fixed config value — 100.0 overflows fp16 gradients.
         if hasattr(self.model, "logit_scale"):
