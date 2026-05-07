@@ -52,5 +52,5 @@ server_configs:
   comm_configs:
     grpc_configs:
       server_uri: localhost:50051
-      max_message_size: 1048576
+      max_message_size: 268435456
       use_ssl: False

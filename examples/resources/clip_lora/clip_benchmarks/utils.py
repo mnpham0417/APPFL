@@ -57,7 +57,12 @@ def listdir_nohidden(path, sort=False):
          path (str): directory path.
          sort (bool): sort the items.
     """
-    items = [f for f in os.listdir(path) if not f.startswith(".") and "sh" not in f]
+    items = [
+        f
+        for f in os.listdir(path)
+        if not f.startswith(".")
+        and not (osp.isfile(osp.join(path, f)) and f.endswith(".sh"))
+    ]
     if sort:
         items.sort()
     return items

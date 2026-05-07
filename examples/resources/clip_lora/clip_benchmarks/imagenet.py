@@ -1069,24 +1069,25 @@ class ImageNet:
         self.template = imagenet_templates
         self.classnames = imagenet_classes
 
-        split_by_label_dict = defaultdict(list)
-        for i in range(len(self.train_x.imgs)):
-            split_by_label_dict[self.train_x.targets[i]].append(self.train_x.imgs[i])
-        imgs = []
-        targets = []
-        imgs_val = []
-        targets_val = []
-        for label, items in split_by_label_dict.items():
-            samples = random.sample(items, num_shots + num_shots_val)
-            imgs = imgs + samples[0:num_shots]
-            imgs_val = imgs_val + samples[num_shots : num_shots + num_shots_val]
-            targets = targets + [label for i in range(num_shots)]
-            targets_val = targets_val + [label for i in range(num_shots_val)]
+        if num_shots > 0:
+            split_by_label_dict = defaultdict(list)
+            for i in range(len(self.train_x.imgs)):
+                split_by_label_dict[self.train_x.targets[i]].append(self.train_x.imgs[i])
+            imgs = []
+            targets = []
+            imgs_val = []
+            targets_val = []
+            for label, items in split_by_label_dict.items():
+                samples = random.sample(items, num_shots + num_shots_val)
+                imgs = imgs + samples[0:num_shots]
+                imgs_val = imgs_val + samples[num_shots : num_shots + num_shots_val]
+                targets = targets + [label for i in range(num_shots)]
+                targets_val = targets_val + [label for i in range(num_shots_val)]
 
-        self.train_x.imgs = imgs
-        self.train_x.targets = targets
-        self.train_x.samples = imgs
+            self.train_x.imgs = imgs
+            self.train_x.targets = targets
+            self.train_x.samples = imgs
 
-        self.val.imgs = imgs_val
-        self.val.targets = targets_val
-        self.val.samples = imgs_val
+            self.val.imgs = imgs_val
+            self.val.targets = targets_val
+            self.val.samples = imgs_val
